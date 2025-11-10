@@ -1,0 +1,17 @@
+# PHOTOSORT v7.1 - Dependencies
+
+# Required (Core functionality)
+requests>=2.31.0
+Pillow>=10.0.0
+imagehash>=4.3.1
+opencv-python>=4.8.0
+numpy>=1.24.0
+exifread>=3.0.0
+
+# Optional (Enhanced UX - highly recommended)
+tqdm>=4.66.0
+colorama>=0.4.6
+inquirer>=3.1.0
+
+# Note: inquirer may require additional system dependencies on some platforms
+# If inquirer install fails, the app will gracefully fall back to text input

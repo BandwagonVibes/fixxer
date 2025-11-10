@@ -1,0 +1,282 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2822
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 #!/usr/bin/env python3\
+"""\
+BakLLaVA Photo Organizer\
+Renames photos using local vision model and organizes into smart groups.\
+\
+V7.0 (AI Critic) Update:\
+- Adds '--critique' / '--art' command for V7.0.\
+- Runs AI "Creative Director" prompt on a folder of images.\
+- Saves detailed .json sidecar files for each image.\
+- Integrates a global config file (~/.photosort.conf).\
+- v7.0-RC2: Patched config loader, implemented --model override and --dry-run for critique.\
+\
+V6.5 (Auto Mode) Update:\
+- Renamed '--smart-ingest' to '--auto' for clarity\
+- Reordered workflow: asks for config BEFORE processing\
+- Extracted helper function to eliminate code duplication\
+- Added validation checks after each automation step\
+- Fixed duplicate print statement\
+- Standardized emoji usage throughout\
+"""\
+# ... (rest of docstring) ...\
+\
+import os\
+# ... (imports) ...\
+from io import BytesIO\
+\
+# ... (V5, V6, V6.4 Libs) ...\
+\
+# ... (check_dcraw) ...\
+\
+# ... (Configuration, Constants) ...\
+\
+# --- V7.0: AI Critic "Gold Master" Prompt ---\
+AI_CRITIC_PROMPT = """\
+You are a professional Creative Director and magazine photo editor. Your job is to provide ambitious, artistic, and creative feedback to elevate a photo from "good" to "great."\
+\
+**CREATIVE TOOLBOX (Use these for your suggestion):**\
+* **Mood & Atmosphere:** (e.g., 'cinematic,' 'moody,' 'ethereal,' 'nostalgic,' 'dramatic')\
+* **Color Grading:** (e.g., 'filmic teal-orange,' 'warm vintage,' 'cool desaturation,' 'split-toning')\
+* **Light & Shadow:** (e.g., 'crushed blacks,' 'soft, lifted shadows,' 'localized dodging/burning,' 'a subtle vignette')\
+* **Texture:** (e.g., 'add fine film grain,' 'soften the focus,' 'increase clarity')\
+\
+**YOUR TASK:**\
+Analyze the provided image by following these steps *internally*:\
+1.  **Composition:** Analyze balance, guiding principles (thirds, lines), and subject placement. Rate it 1-10.\
+2.  **Lighting & Exposure:** Analyze quality, direction, temperature, and any blown highlights or crushed shadows.\
+3.  **Color & Style:** Analyze the color palette, white balance, and current post-processing style.\
+\
+After your analysis, you MUST return **ONLY a single, valid JSON object**. Do not provide *any* other text, preamble, or conversation. Your response must be 100% valid JSON, formatted *exactly* like this template:\
+\
+```json\
+\{\
+  "composition_score": <an integer from 1 to 10>,\
+  "composition_critique": "<A brief, one-sentence critique of the composition.>",\
+  "lighting_critique": "<A brief, one-sentence critique of the lighting and exposure.>",\
+  "color_critique": "<A brief, one-sentence critique of the color and current style.>",\
+  "final_verdict": "<A one-sentence summary of what works and what doesn't.>",\
+  "creative_mood": "<The single, most ambitious 'Creative Mood' this photo could have, chosen from the toolbox.>",\
+  "creative_suggestion": "<Your single, ambitious, artistic post-processing suggestion to achieve that mood. This must be a detailed, actionable paragraph. **Example:** To achieve a 'Cinematic & Moody' feel, apply a 'Cinematic & Moody' color grade, slightly crush the blacks to add contrast, and use localized burning on the edges to pull the eye to the subject.>"\
+\}\
+```\
+"""\
+\
+\
+def load_app_config() -> Dict[str, Any]:\
+    """\
+    V7.0: Loads settings from ~/.photosort.conf\
+    Uses hardcoded defaults as fallbacks.\
+    RC2: Now crash-proof. Uses .get() with fallbacks for all values.\
+    """\
+    parser = configparser.ConfigParser()\
+    if CONFIG_FILE_PATH.exists():\
+        parser.read(CONFIG_FILE_PATH)\
+        print(f" \uc0\u9432  Loaded config from: \{CONFIG_FILE_PATH\}")\
+\
+    config = \{\}\
+\
+    # Ingest settings\
+    config['default_destination'] = Path(parser.get(\
+        'ingest', 'default_destination',\
+        fallback=str(DEFAULT_DESTINATION_BASE)\
+    )).expanduser()\
+    config['default_model'] = parser.get(\
+        'ingest', 'default_model',\
+        fallback=DEFAULT_MODEL_NAME\
+    )\
+\
+    # Cull thresholds\
+    config['cull_thresholds'] = \{\
+        'sharpness_good': parser.getfloat('cull', 'sharpness_good', fallback=DEFAULT_CULL_THRESHOLDS['sharpness_good']),\
+        'sharpness_dud': parser.getfloat('cull', 'sharpness_dud', fallback=DEFAULT_CULL_THRESHOLDS['sharpness_dud']),\
+        'exposure_dud_pct': parser.getfloat('cull', 'exposure_dud_pct', fallback=DEFAULT_CULL_THRESHOLDS['exposure_dud_pct']),\
+        'exposure_good_pct': parser.getfloat('cull', 'exposure_good_pct', fallback=DEFAULT_CULL_THRESHOLDS['exposure_good_pct']),\
+    \}\
+\
+    # Burst threshold\
+    config['burst_threshold'] = parser.getint(\
+        'burst', 'similarity_threshold',\
+        fallback=DEFAULT_BURST_THRESHOLD\
+    )\
+\
+    # V7.0 Critique settings\
+    config['critique_model'] = parser.get(\
+        'critique', 'default_model',\
+        fallback=DEFAULT_CRITIQUE_MODEL\
+    )\
+\
+    return config\
+\
+# ... (get_available_models) ...\
+# ... (convert_raw_to_jpeg) ...\
+# ... (encode_image) ...\
+# ... (get_image_hash) ...\
+# ... (get_ai_description) ...\
+# ... (get_ai_critique) ...\
+# ... (clean_filename) ...\
+# ... (get_unique_filename) ...\
+# ... (categorize_description) ...\
+# ... (process_single_image) ...\
+# ... (organize_into_folders) ...\
+# ... (process_directory) ...\
+# ... (group_bursts_in_directory) ...\
+# ... (analyze_image_quality) ...\
+# ... (get_image_bytes_for_analysis) ...\
+# ... (process_image_for_culling) ...\
+# ... (cull_images_in_directory) ...\
+# ... (prep_smart_export) ...\
+# ... (format_duration) ...\
+# ... (generate_bar_chart) ...\
+# ... (analyze_single_exif) ...\
+# ... (show_exif_insights) ...\
+# ... (get_ingest_config) ...\
+# ... (auto_workflow) ...\
+\
+\
+def critique_images_in_directory(directory: Path, dry_run: bool, APP_CONFIG: dict, max_workers: int = MAX_WORKERS):\
+    """\
+    (V7.0) Generates artistic critiques for images.\
+    Saves JSON sidecar files next to each image.\
+    RC2: Implemented --dry-run, --model override, and model availability check.\
+    """\
+    \
+    print("\\n" + "="*60)\
+    print(" \uc0\u55356 \u57256  BakLLaVA Photo Organizer --- (AI Critic Mode)")\
+    print("="*60)\
+    \
+    # RC2 FIX: Check for --model override in CLI args\
+    cli_model_override = None\
+    if "--model" in sys.argv:\
+        try:\
+            model_index = sys.argv.index("--model") + 1\
+            if model_index < len(sys.argv):\
+                cli_model_override = sys.argv[model_index]\
+        except Exception:\
+            print(" \uc0\u9888 \u65039   Could not parse --model argument. Using default.")\
+            pass # Badly formed arg, ignore\
+    \
+    model_name = cli_model_override or APP_CONFIG['critique_model']\
+    \
+    print(f" Analyzing images in: \{directory\}")\
+    if cli_model_override:\
+        print(f" \uc0\u9432   Overriding config with CLI model: \{model_name\}")\
+    else:\
+        print(f" Using Creative Director model: \{model_name\}")\
+    \
+    # RC2 FIX: Check model availability\
+    available_models = get_available_models()\
+    if available_models and model_name not in available_models:\
+        print(f"\\n \uc0\u9888 \u65039   Warning: Model '\{model_name\}' not found in 'ollama list'.")\
+        print(f"   Available: \{', '.join(available_models)\}")\
+        confirm = input("   Continue anyway? (y/n): ").strip().lower()\
+        if confirm != 'y':\
+            print("Cancelled.")\
+            return\
+    elif available_models is None:\
+        print("\\n \uc0\u10060  FATAL: Could not connect to Ollama server.")\
+        print("   Please ensure Ollama is running.")\
+        return\
+\
+    print(f" Output: .json sidecar files (e.g., photo.json)")\
+    \
+    image_files = [\
+        f for f in directory.iterdir() \
+        if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS\
+    ]\
+    \
+    if not image_files:\
+        print("     No supported images to analyze. Exiting.")\
+        return\
+\
+    # Find files that *don't* have a .json sidecar yet\
+    files_to_critique = []\
+    for f in image_files:\
+        if not f.with_suffix('.json').exists():\
+            files_to_critique.append(f)\
+    \
+    if not files_to_critique:\
+        print(f"\\n All \{len(image_files)\} images already have .json critiques. All done!")\
+        return\
+\
+    print(f"\\n Found \{len(files_to_critique)\} new images to critique (skipping \{len(image_files) - len(files_to_critique)\} already done).")\
+    \
+    # RC2 FIX: Implement --dry-run\
+    if dry_run:\
+        print("\\n [PREVIEW] Would analyze the following files:")\
+        for f in files_to_critique:\
+            print(f"   \'95 \{f.name\}")\
+        print("\\n [PREVIEW] Dry run complete. No critiques were generated.")\
+        return\
+\
+    results = \{"success": 0, "failed": 0, "invalid_json": 0\}\
+    \
+    if TQDM_AVAILABLE:\
+        pbar = tqdm(total=len(files_to_critique), desc=" \uc0\u55356 \u57256  Critiquing", unit="img", ncols=80)\
+    \
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:\
+        future_to_file = \{\
+            executor.submit(get_ai_critique, img_path, model_name): img_path \
+            for img_path in files_to_critique\
+        \}\
+        \
+        for future in as_completed(future_to_file):\
+            img_path = future_to_file[future]\
+            json_string = future.result()\
+            json_path = img_path.with_suffix('.json')\
+\
+            if not json_string:\
+                results["failed"] += 1\
+                if TQDM_AVAILABLE:\
+                    pbar.write(f" \uc0\u10060  \{img_path.name\}: Failed (No response from model)")\
+                continue\
+\
+            try:\
+                # Clean up potential markdown fences\
+                if json_string.startswith("```json"):\
+                    json_string = json_string.strip("```json\\n")\
+                if json_string.endswith("```"):\
+                    json_string = json_string.strip("```\\n")\
+                \
+                # This is the "paranoid" check that was already here.\
+                data = json.loads(json_string) \
+                \
+                with open(json_path, 'w') as f:\
+                    json.dump(data, f, indent=2)\
+                \
+                results["success"] += 1\
+\
+            except json.JSONDecodeError:\
+                results["invalid_json"] += 1\
+                if TQDM_AVAILABLE:\
+                    pbar.write(f" \uc0\u10060  \{img_path.name\}: Failed (Model returned invalid JSON)")\
+                # Save the bad response for debugging\
+                with open(img_path.with_suffix('.bad.json'), 'w') as f:\
+                    f.write(json_string)\
+            except Exception as e:\
+                results["failed"] += 1\
+                if TQDM_AVAILABLE:\
+                    pbar.write(f" \uc0\u10060  \{img_path.name\}: Failed (\{e\})")\
+\
+            if TQDM_AVAILABLE:\
+                pbar.update(1)\
+\
+    if TQDM_AVAILABLE:\
+        pbar.close()\
+\
+    print(f"\\n\{'='*60\}")\
+    print(" \uc0\u55356 \u57256  Critique Complete")\
+    print(f"   Successfully generated: \{results['success']\}")\
+    print(f"   Invalid JSON returned:  \{results['invalid_json']\}")\
+    print(f"   Failed (no response):   \{results['failed']\}")\
+    print("="*60)\
+    print(f" JSON sidecar files are saved in: \{directory\}")\
+\
+# ... (run_default_ingest) ...\
+# ... (main) ...}

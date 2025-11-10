@@ -1,0 +1,188 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2822
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica-Bold;\f1\fswiss\fcharset0 Helvetica;\f2\fswiss\fcharset0 Helvetica-Oblique;
+}
+{\colortbl;\red255\green255\blue255;\red0\green0\blue0;}
+{\*\expandedcolortbl;;\cssrgb\c0\c0\c0;}
+{\*\listtable{\list\listtemplateid1\listhybrid{\listlevel\levelnfc23\levelnfcn23\leveljc0\leveljcn0\levelfollow0\levelstartat1\levelspace360\levelindent0{\*\levelmarker \{disc\}}{\leveltext\leveltemplateid1\'01\uc0\u8226 ;}{\levelnumbers;}\fi-360\li720\lin720 }{\listlevel\levelnfc23\levelnfcn23\leveljc0\leveljcn0\levelfollow0\levelstartat1\levelspace360\levelindent0{\*\levelmarker \{circle\}}{\leveltext\leveltemplateid2\'01\uc0\u9702 ;}{\levelnumbers;}\fi-360\li1440\lin1440 }{\listname ;}\listid1}
+{\list\listtemplateid2\listhybrid{\listlevel\levelnfc0\levelnfcn0\leveljc0\leveljcn0\levelfollow0\levelstartat1\levelspace360\levelindent0{\*\levelmarker \{decimal\}}{\leveltext\leveltemplateid101\'01\'00;}{\levelnumbers\'01;}\fi-360\li720\lin720 }{\listname ;}\listid2}
+{\list\listtemplateid3\listhybrid{\listlevel\levelnfc0\levelnfcn0\leveljc0\leveljcn0\levelfollow0\levelstartat1\levelspace360\levelindent0{\*\levelmarker \{decimal\}}{\leveltext\leveltemplateid201\'01\'00;}{\levelnumbers\'01;}\fi-360\li720\lin720 }{\listname ;}\listid3}}
+{\*\listoverridetable{\listoverride\listid1\listoverridecount0\ls1}{\listoverride\listid2\listoverridecount0\ls2}{\listoverride\listid3\listoverridecount0\ls3}}
+\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\deftab720
+\pard\pardeftab720\sa321\partightenfactor0
+
+\f0\b\fs48 \cf0 \expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 AI Critic (v7) R&D Debrief & Integration Specification\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f1\b0\fs24 \cf0 Project: photosort.py\
+Component: v7 "AI Critic" Feature\
+Status: R&D Complete. Ready for Integration.\
+\pard\pardeftab720\sa298\partightenfactor0
+
+\f0\b\fs36 \cf0 1. Executive Summary\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f1\b0\fs24 \cf0 This document summarizes the R&D and automated testing phase for the "AI Critic" feature. The goal was to find a local VLM (Vision Language Model) and a "Gold Master" prompt capable of providing reliable, high-quality, 
+\f2\i artistic
+\f1\i0  feedback for a photograph, going far beyond simple description.\
+Through a rigorous, data-driven "gauntlet" test, we have successfully identified a "giant-slayer" model and a bulletproof prompt that is fast, 100% reliable, and produces S-tier creative critiques suitable for a "Gold Master" application.\
+\pard\pardeftab720\sa298\partightenfactor0
+
+\f0\b\fs36 \cf0 2. The "Gold Master" Package\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f1\b0\fs24 \cf0 This is the final, approved package to be integrated into photosort.py. It is the result of all our iterative testing.\
+\pard\pardeftab720\sa280\partightenfactor0
+
+\f0\b\fs28 \cf0 A. The Engine (The Model)\
+\pard\tx220\tx720\pardeftab720\li720\fi-720\sa240\partightenfactor0
+\ls1\ilvl0
+\fs24 \cf0 \kerning1\expnd0\expndtw0 \outl0\strokewidth0 {\listtext	\uc0\u8226 	}\expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 Model:
+\f1\b0  openbmb/minicpm-v2.6:q4_K_M\
+\ls1\ilvl0
+\f0\b \kerning1\expnd0\expndtw0 \outl0\strokewidth0 {\listtext	\uc0\u8226 	}\expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 Reason:
+\f1\b0  Our tests proved this is the "Gold Master" choice.\
+\pard\tx940\tx1440\pardeftab720\li1440\fi-1440\sa240\partightenfactor0
+\ls1\ilvl1
+\f0\b \cf0 \kerning1\expnd0\expndtw0 \outl0\strokewidth0 {\listtext	\uc0\u9702 	}\expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 Performance:
+\f1\b0  It runs on the GPU/Metal "fast path," processing images in an acceptable 
+\f0\b ~20-30 seconds
+\f1\b0  (vs. 120+ seconds for llava).\
+\ls1\ilvl1
+\f0\b \kerning1\expnd0\expndtw0 \outl0\strokewidth0 {\listtext	\uc0\u9702 	}\expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 Reliability:
+\f1\b0  It achieved a 
+\f0\b 100% success rate ("failed": 0)
+\f1\b0  [cite: critic_log_openbmb_minicpm-v2.6_q4_K_M_20251105_115503.json], even with our most complex prompt.\
+\ls1\ilvl1
+\f0\b \kerning1\expnd0\expndtw0 \outl0\strokewidth0 {\listtext	\uc0\u9702 	}\expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 Quality:
+\f1\b0  It consistently provided high-level, creative, and non-repetitive artistic advice, solving the "Describe vs. Critique" gap our research identified [cite: AI critic research.txt].\
+\pard\pardeftab720\sa280\partightenfactor0
+
+\f0\b\fs28 \cf0 B. The Driver (The "V3" Prompt)\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f1\b0\fs24 \cf0 This "Creative Director" prompt is the final version, engineered to be both creatively ambitious and structurally rigid.\
+\pard\pardeftab720\partightenfactor0
+\cf0 THE_PROMPT = """\
+You are a professional Creative Director and magazine photo editor. Your job is to provide ambitious, artistic, and creative feedback to elevate a photo from "good" to "great."\
+\
+**CREATIVE TOOLBOX (Use these for your suggestion):**\
+* **Mood & Atmosphere:** (e.g., 'cinematic,' 'moody,' 'ethereal,' 'nostalgic,' 'dramatic')\
+* **Color Grading:** (e.g., 'filmic teal-orange,' 'warm vintage,' 'cool desaturation,' 'split-toning')\
+* **Light & Shadow:** (e.g., 'crushed blacks,' 'soft, lifted shadows,' 'localized dodging/burning,' 'a subtle vignette')\
+* **Texture:** (e.g., 'add fine film grain,' 'soften the focus,' 'increase clarity')\
+\
+**YOUR TASK:**\
+Analyze the provided image by following these steps *internally*:\
+1.  **Composition:** Analyze balance, guiding principles (thirds, lines), and subject placement. Rate it 1-10.\
+2.  **Lighting & Exposure:** Analyze quality, direction, temperature, and any blown highlights or crushed shadows.\
+3.  **Color & Style:** Analyze the color palette, white balance, and current post-processing style.\
+\
+After your analysis, you MUST return **ONLY a single, valid JSON object**. Do not provide *any* other text, preamble, or conversation. Your response must be 100% valid JSON, formatted *exactly* like this template:\
+\
+```json\
+\{\
+  "composition_score": <an integer from 1 to 10>,\
+  "composition_critique": "<A brief, one-sentence critique of the composition.>",\
+  "lighting_critique": "<A brief, one-sentence critique of the lighting and exposure.>",\
+  "color_critique": "<A brief, one-sentence critique of the color and current style.>",\
+  "final_verdict": "<A one-sentence summary of what works and what doesn't.>",\
+  "creative_mood": "<The single, most ambitious 'Creative Mood' this photo could have, chosen from the toolbox.>",\
+  "creative_suggestion": "<Your single, ambitious, artistic post-processing suggestion to achieve that mood. This must be a detailed, actionable paragraph. **Example:** To achieve a 'Cinematic & Moody' feel, apply a teal-orange color grade, slightly crush the blacks to add contrast, and use localized burning on the edges to pull the eye to the subject.>"\
+\}\
+\
+\pard\pardeftab720\sa240\partightenfactor0
+\cf0 """\
+\pard\pardeftab720\partightenfactor0
+\cf0 ### C. The Output (The Expected JSON)\
+\
+Our final test confirmed this prompt *reliably* produces this clean, predictable JSON structure, which is now ready to be parsed by our Python app.\
+\
+```json\
+\{\
+  "composition_score": 8,\
+  "composition_critique": "The composition is well-balanced with subjects placed thoughtfully along the rule of thirds.",\
+  "lighting_critique": "Natural daylight provides good illumination, but there's a slight overcast which could be enhanced for moodiness.",\
+  "color_critique": "Neutral colors are appropriate and true to life. The color grading can benefit from desaturation slightly to give it more depth.",\
+  "final_verdict": "The photo is well-composed with clear subjects, though the lighting could use a bit of enhancement.",\
+  "creative_mood": "Nostalgic",\
+  "creative_suggestion": "To achieve a 'Nostalgic' mood, add a vintage color grade to desaturate colors slightly and warm up the overall tone. Use localized dodging on the pavement to emphasize texture and depth."\
+\}\
+\
+\pard\pardeftab720\sa298\partightenfactor0
+
+\f0\b\fs36 \cf0 3. R&D Journey: How We Got Here\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f1\b0\fs24 \cf0 This package is the result of a rigorous, iterative testing process that disqualified several "obvious" candidates.\
+\pard\tx220\tx720\pardeftab720\li720\fi-720\sa240\partightenfactor0
+\ls2\ilvl0
+\f0\b \cf0 \kerning1\expnd0\expndtw0 \outl0\strokewidth0 {\listtext	1	}\expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 gemma:27b (Disqualified):
+\f1\b0  Our asitop analysis showed this model was a "hardware mismatch." It was not Metal-optimized, fell back to 100% CPU, and caused massive memory swapping, resulting in a system-wide throttle.\
+\ls2\ilvl0
+\f0\b \kerning1\expnd0\expndtw0 \outl0\strokewidth0 {\listtext	2	}\expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 llava:13b (Disqualified):
+\f1\b0  Our asitop and log analysis showed this model 
+\f2\i also
+\f1\i0  fell back to a CPU-only path, making it 10x slower than expected. Our logs also caught it with a 
+\f0\b 9% failure rate
+\f1\b0  (it returned invalid, truncated JSON [cite: critic_log_llava_13b_20251105_101706.json]) and its creative advice was low-quality and nonsensical ("use a tripod for a long exposure" on a candid shot).\
+\ls2\ilvl0
+\f0\b \kerning1\expnd0\expndtw0 \outl0\strokewidth0 {\listtext	3	}\expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 qwen3-vl (Disqualified):
+\f1\b0  Our initial tests showed this model was not a true VLM in the Ollama GUI (it only responded to text), making it a non-starter.\
+\ls2\ilvl0
+\f0\b \kerning1\expnd0\expndtw0 \outl0\strokewidth0 {\listtext	4	}\expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 minicpm-v2.6 (Crowned Champion):
+\f1\b0  This model passed all tests: it ran on the GPU, was fast (
+\f0\b ~20-30s/img
+\f1\b0 ), had a 
+\f0\b 0% failure rate
+\f1\b0 , and responded intelligently to our "Creative Director" prompts.\
+\pard\pardeftab720\sa298\partightenfactor0
+
+\f0\b\fs36 \cf0 4. Integration Plan (How it Fits photosort.py)\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f1\b0\fs24 \cf0 This new feature will not replace the existing AI-naming workflow. It will be a new, 
+\f2\i optional
+\f1\i0  tool that the user can run 
+\f2\i after
+\f1\i0  culling/prepping.\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\b \cf0 Next Steps for the v7 Build:
+\f1\b0 \
+\pard\tx220\tx720\pardeftab720\li720\fi-720\sa240\partightenfactor0
+\ls3\ilvl0
+\f0\b \cf0 \kerning1\expnd0\expndtw0 \outl0\strokewidth0 {\listtext	1	}\expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 Integrate:
+\f1\b0  Add the "Gold Master" prompt and a new function get_ai_critique() to photosort.py. This function will be based on our test_critic.py harness and will call the openbmb/minicpm-v2.6 model.\
+\ls3\ilvl0
+\f0\b \kerning1\expnd0\expndtw0 \outl0\strokewidth0 {\listtext	2	}\expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 Add Flag:
+\f1\b0  Add a new command to the DISPATCH_TABLE (e.g., --critique or --art-director).\
+\ls3\ilvl0
+\f0\b \kerning1\expnd0\expndtw0 \outl0\strokewidth0 {\listtext	3	}\expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 Define Target:
+\f1\b0  This new command should 
+\f2\i not
+\f1\i0  run on all photos. It should be pointed at a specific folder, (e.g., _Keepers or _ReadyForLightroom).\
+\ls3\ilvl0
+\f0\b \kerning1\expnd0\expndtw0 \outl0\strokewidth0 {\listtext	4	}\expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 Save Output:
+\f1\b0  The function should save the resulting JSON as a "sidecar" file, with the same name as the image but with a .json extension (e.g., P1130226.jpeg will have a P1130226.json saved next to it).\
+\ls3\ilvl0
+\f0\b \kerning1\expnd0\expndtw0 \outl0\strokewidth0 {\listtext	5	}\expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 Report:
+\f1\b0  The script should print a simple "Critique saved for P1130226.jpeg" to the console.\
+\pard\pardeftab720\sa240\partightenfactor0
+\cf0 This R&D phase is complete and successful. We are cleared to begin integration.\
+}

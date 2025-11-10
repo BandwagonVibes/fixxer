@@ -1,0 +1,237 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2822
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\froman\fcharset0 Times-Roman;\f1\fmodern\fcharset0 Courier;\f2\froman\fcharset0 Times-Bold;
+\f3\fmodern\fcharset0 Courier-Bold;\f4\froman\fcharset0 Times-Italic;}
+{\colortbl;\red255\green255\blue255;\red0\green0\blue0;\red109\green109\blue109;}
+{\*\expandedcolortbl;;\cssrgb\c0\c0\c0;\cssrgb\c50196\c50196\c50196;}
+{\*\listtable{\list\listtemplateid1\listhybrid{\listlevel\levelnfc23\levelnfcn23\leveljc0\leveljcn0\levelfollow0\levelstartat1\levelspace360\levelindent0{\*\levelmarker \{disc\}}{\leveltext\leveltemplateid1\'01\uc0\u8226 ;}{\levelnumbers;}\fi-360\li720\lin720 }{\listname ;}\listid1}
+{\list\listtemplateid2\listhybrid{\listlevel\levelnfc23\levelnfcn23\leveljc0\leveljcn0\levelfollow0\levelstartat1\levelspace360\levelindent0{\*\levelmarker \{disc\}}{\leveltext\leveltemplateid101\'01\uc0\u8226 ;}{\levelnumbers;}\fi-360\li720\lin720 }{\listname ;}\listid2}
+{\list\listtemplateid3\listhybrid{\listlevel\levelnfc23\levelnfcn23\leveljc0\leveljcn0\levelfollow0\levelstartat1\levelspace360\levelindent0{\*\levelmarker \{disc\}}{\leveltext\leveltemplateid201\'01\uc0\u8226 ;}{\levelnumbers;}\fi-360\li720\lin720 }{\listname ;}\listid3}}
+{\*\listoverridetable{\listoverride\listid1\listoverridecount0\ls1}{\listoverride\listid2\listoverridecount0\ls2}{\listoverride\listid3\listoverridecount0\ls3}}
+\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\deftab720
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\fs24 \cf0 \expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 Nick, this is a masterfully built tool\'97modular, artist-aware, and technically robust. I\'92ve reviewed the 
+\f1\fs26 photosort_v7_GM
+\f0\fs24  code and supporting notes with a production mindset: no patches, no hotfixes, just clean, final code. Here\'92s my expert review, broken down into \uc0\u9989  confirmations, \u9888 \u65039  refinements, and \u55358 \u56800  final polish suggestions.\
+\pard\pardeftab720\partightenfactor0
+\cf3 \strokec3 \
+\pard\pardeftab720\sa298\partightenfactor0
+
+\f2\b\fs36 \cf0 \strokec2 \uc0\u9989  Confirmed: Production-Ready Foundations\
+\pard\pardeftab720\sa280\partightenfactor0
+
+\fs28 \cf0 \uc0\u55357 \u56633  Architecture\
+\pard\tx220\tx720\pardeftab720\li720\fi-720\partightenfactor0
+\ls1\ilvl0
+\fs24 \cf0 \kerning1\expnd0\expndtw0 \outl0\strokewidth0 {\listtext	\uc0\u8226 	}\expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 Modular CLI flags
+\f0\b0  (
+\f1\fs26 --auto
+\f0\fs24 , 
+\f1\fs26 --group-bursts
+\f0\fs24 , 
+\f1\fs26 --cull
+\f0\fs24 , 
+\f1\fs26 --prep
+\f0\fs24 , 
+\f1\fs26 --stats
+\f0\fs24 , 
+\f1\fs26 --critique
+\f0\fs24 ) are cleanly dispatched.\
+\ls1\ilvl0
+\f2\b \kerning1\expnd0\expndtw0 \outl0\strokewidth0 {\listtext	\uc0\u8226 	}\expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 Config file integration
+\f0\b0  (
+\f1\fs26 ~/.photosort.conf
+\f0\fs24 ) is robust and fallback-safe.\
+\ls1\ilvl0
+\f2\b \kerning1\expnd0\expndtw0 \outl0\strokewidth0 {\listtext	\uc0\u8226 	}\expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 ThreadPoolExecutor
+\f0\b0  is used consistently for concurrency.\
+\ls1\ilvl0
+\f2\b \kerning1\expnd0\expndtw0 \outl0\strokewidth0 {\listtext	\uc0\u8226 	}\expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 RAW support
+\f0\b0  via 
+\f1\fs26 dcraw
+\f0\fs24  + 
+\f1\fs26 sips
+\f0\fs24  is handled cleanly.\
+\ls1\ilvl0
+\f2\b \kerning1\expnd0\expndtw0 \outl0\strokewidth0 {\listtext	\uc0\u8226 	}\expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 Logging
+\f0\b0  is consistent (
+\f1\fs26 _import_log_*.json
+\f0\fs24 , 
+\f1\fs26 _exif_summary.json
+\f0\fs24 , 
+\f1\fs26 .json
+\f0\fs24  sidecars for critique).\
+\pard\pardeftab720\sa280\partightenfactor0
+
+\f2\b\fs28 \cf0 \uc0\u55357 \u56633  AI Critic Integration\
+\pard\tx220\tx720\pardeftab720\li720\fi-720\partightenfactor0
+\ls2\ilvl0
+\f0\b0\fs24 \cf0 \kerning1\expnd0\expndtw0 \outl0\strokewidth0 {\listtext	\uc0\u8226 	}\expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 Uses a 
+\f2\b structured prompt
+\f0\b0  with internal reasoning and strict JSON output.\
+\ls2\ilvl0\kerning1\expnd0\expndtw0 \outl0\strokewidth0 {\listtext	\uc0\u8226 	}\expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 Model fallback (
+\f1\fs26 minicpm-v2.6
+\f0\fs24 ) is correctly set and overrideable via config.\
+\ls2\ilvl0\kerning1\expnd0\expndtw0 \outl0\strokewidth0 {\listtext	\uc0\u8226 	}\expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 Critique output is saved as 
+\f1\fs26 .json
+\f0\fs24  sidecar files\'97non-invasive and future-proof.\
+\pard\pardeftab720\sa280\partightenfactor0
+
+\f2\b\fs28 \cf0 \uc0\u55357 \u56633  Core Engines\
+\pard\tx220\tx720\pardeftab720\li720\fi-720\partightenfactor0
+\ls3\ilvl0
+\f1\b0\fs26 \cf0 \kerning1\expnd0\expndtw0 \outl0\strokewidth0 {\listtext	\uc0\u8226 	}\expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 analyze_image_quality()
+\f0\fs24  is reused across cull, burst, and prep\'97excellent DRY principle.\
+\ls3\ilvl0
+\f1\fs26 \kerning1\expnd0\expndtw0 \outl0\strokewidth0 {\listtext	\uc0\u8226 	}\expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 get_image_bytes_for_analysis()
+\f0\fs24  handles RAW and JPEG/PNG gracefully.\
+\ls3\ilvl0
+\f1\fs26 \kerning1\expnd0\expndtw0 \outl0\strokewidth0 {\listtext	\uc0\u8226 	}\expnd0\expndtw0\kerning0
+\outl0\strokewidth0 \strokec2 get_ai_critique()
+\f0\fs24  enforces JSON format and handles timeouts.\
+\pard\pardeftab720\partightenfactor0
+\cf3 \strokec3 \
+\pard\pardeftab720\sa298\partightenfactor0
+
+\f2\b\fs36 \cf0 \strokec2 \uc0\u9888 \u65039  Refinements Worth Considering (Pre-Release)\
+\pard\pardeftab720\sa280\partightenfactor0
+
+\fs28 \cf0 1. Critique JSON Validation\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\b0\fs24 \cf0 Right now, 
+\f1\fs26 get_ai_critique()
+\f0\fs24  assumes the model returns valid JSON. If the model slips (e.g., adds commentary), the script may crash or silently fail.\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f2\b \cf0 Suggestion
+\f0\b0 : Add a 
+\f1\fs26 try: json.loads()
+\f0\fs24  check to validate the response before saving. If it fails, log the error and skip the file.\
+\pard\pardeftab720\partightenfactor0
+
+\f1\fs26 \cf0 try:\
+    parsed = json.loads(json_string)\
+except json.JSONDecodeError:\
+    print(f"\uc0\u10060  Invalid JSON from model for \{image_path.name\}")\
+    return None\
+\pard\pardeftab720\partightenfactor0
+
+\f0\fs24 \cf3 \strokec3 \
+\pard\pardeftab720\sa280\partightenfactor0
+
+\f2\b\fs28 \cf0 \strokec2 2. Critique Output Naming\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\b0\fs24 \cf0 Currently, critique output is saved as a 
+\f1\fs26 .json
+\f0\fs24  file, but it\'92s not clear if it\'92s named after the image or stored in a consistent location.\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f2\b \cf0 Suggestion
+\f0\b0 : Save as 
+\f1\fs26 filename_critique.json
+\f0\fs24  in the same folder as the image. This keeps it portable and easy to pair with the original.\
+\pard\pardeftab720\partightenfactor0
+\cf3 \strokec3 \
+\pard\pardeftab720\sa280\partightenfactor0
+
+\f2\b\fs28 \cf0 \strokec2 3. Model Availability Check\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\b0\fs24 \cf0 You already have 
+\f1\fs26 get_available_models()
+\f0\fs24 , but 
+\f1\fs26 --critique
+\f0\fs24  doesn\'92t seem to validate that the selected model is actually installed.\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f2\b \cf0 Suggestion
+\f0\b0 : Before running 
+\f1\fs26 get_ai_critique()
+\f0\fs24 , check if 
+\f1\fs26 model_name
+\f0\fs24  is in 
+\f1\fs26 get_available_models()
+\f0\fs24  and warn if not.\
+\pard\pardeftab720\partightenfactor0
+\cf3 \strokec3 \
+\pard\pardeftab720\sa280\partightenfactor0
+
+\f2\b\fs28 \cf0 \strokec2 4. Critique Summary Option\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\b0\fs24 \cf0 You could optionally add a 
+\f1\fs26 --critique-summary
+\f0\fs24  flag that aggregates all 
+\f1\fs26 .json
+\f0\fs24  sidecars into a single 
+\f1\fs26 _critique_summary.md
+\f0\fs24  file with top picks and mood notes.\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f2\b \cf0 Why
+\f0\b0 : Helps you scan a folder\'92s artistic potential at a glance.\
+\pard\pardeftab720\partightenfactor0
+\cf3 \strokec3 \
+\pard\pardeftab720\sa298\partightenfactor0
+
+\f2\b\fs36 \cf0 \strokec2 \uc0\u55358 \u56800  Final Polish Suggestions\
+\pard\pardeftab720\sa280\partightenfactor0
+
+\fs28 \cf0 \uc0\u55357 \u56632  ASCII Banner\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\b0\fs24 \cf0 You mentioned legacy polish\'97add a 
+\f1\fs26 print_banner()
+\f0\fs24  function with red/white ASCII art and camera-inspired design. Trigger it on startup or with a 
+\f1\fs26 --flair
+\f0\fs24  flag.\
+\pard\pardeftab720\sa280\partightenfactor0
+
+\f2\b\fs28 \cf0 \uc0\u55357 \u56632  Completion Notification\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\b0\fs24 \cf0 After 
+\f1\fs26 --auto
+\f0\fs24  or 
+\f1\fs26 --critique
+\f0\fs24 , print a final message like:\
+\pard\pardeftab720\partightenfactor0
+
+\f1\fs26 \cf0 \uc0\u10024  Done! Your shoot has been ingested, culled, stacked, and critiqued.\
+\uc0\u55357 \u56513  Ready for editing: ~/iCloud Drive/negatives/2025-11-05_Street-Scenes/\
+\pard\pardeftab720\sa280\partightenfactor0
+
+\f2\b\fs28 \cf0 \uc0\u55357 \u56632  Optional 
+\f3\fs30\fsmilli15210 --dry-run
+\f2\fs28  for 
+\f3\fs30\fsmilli15210 --critique
+\f2\fs28 \
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\b0\fs24 \cf0 Just like ingest and cull, let users preview which files will be critiqued without running the model.\
+\pard\pardeftab720\partightenfactor0
+\cf3 \strokec3 \
+\pard\pardeftab720\sa298\partightenfactor0
+
+\f2\b\fs36 \cf0 \strokec2 \uc0\u55356 \u57281  Final Verdict\
+\pard\pardeftab720\sa240\partightenfactor0
+
+\f0\b0\fs24 \cf0 This is a true Gold Master. You\'92ve built a tool that\'92s not just functional\'97it\'92s 
+\f4\i thoughtful
+\f0\i0 . It respects the artist\'92s time, attention, and creative flow. With the minor refinements above, you\'92ll lock in stability, clarity, and polish worthy of a final release.\
+If you want help implementing any of these last tweaks, I\'92m here. Otherwise, I\'92d say: burn it to disc, slap on the ASCII splash screen, and ship it like it\'92s 1999.\
+}

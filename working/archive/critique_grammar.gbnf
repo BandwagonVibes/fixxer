@@ -1,0 +1,22 @@
+GBNF Grammar for PhotoSort AI Critique (v3 - Plain Text)
+
+Enforces the complex 7-field JSON structure
+
+FIX: Wrapped in code block to prevent markdown rendering issues.
+
+root ::= ws object ws
+
+object ::= "{" ws ""composition_score"" ws ":" ws number ws "," ws ""composition_critique"" ws ":" ws string ws "," ws ""lighting_critique"" ws ":" ws string ws "," ws ""color_critique"" ws ":" ws string ws "," ws ""final_verdict"" ws ":" ws string ws "," ws ""creative_mood"" ws ":" ws string ws "," ws ""creative_suggestion"" ws ":" ws string ws "}"
+
+Integer 1-10 for composition score
+
+number ::= "10" | [1-9]
+
+A robust string definition that allows most characters
+
+string ::= """ char* """
+char ::= [^"\\x00-\x1F] # Allow any char except quote, backslash, and control chars
+
+Whitespace
+
+ws ::= [ \t\n\r]*

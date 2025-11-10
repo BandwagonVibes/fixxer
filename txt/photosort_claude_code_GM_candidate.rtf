@@ -1,0 +1,1352 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2822
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 #!/usr/bin/env python3\
+"""\
+BakLLaVA Photo Organizer\
+Renames photos using local vision model and organizes into smart groups.\
+\
+V6.5 (Auto Mode) Update:\
+- Renamed '--smart-ingest' to '--auto' for clarity\
+- Reordered workflow: asks for config BEFORE processing\
+- Extracted helper function to eliminate code duplication\
+- Added validation checks after each automation step\
+- Fixed duplicate print statement\
+- Standardized emoji usage throughout\
+\
+V6.4 (Ready) Refactor:\
+- Refactored main() to use a dispatch table instead of if/elif.\
+- Added V6.4 (--stats) import block for 'exifread'.\
+- Added calibration comments to CULL_THRESHOLDS.\
+\
+V6.3 (Smart Prep) Update:\
+- Adds '--prep' / '--pe' flag to find "Good" tier images and\
+  COPY them to a "_ReadyForLightroom" folder.\
+\
+V6.2 (Best Pick) Update:\
+- Upgrades '--group-bursts' to analyze all images in a burst\
+  and rename the sharpest one with "_PICK_".\
+\
+V6.0 (Cull Mode) Update:\
+- Adds '--cull' / '-c' flag to analyze technical quality (sharpness, exposure).\
+- Moves files into folders: _Keepers, _Review_Maybe, _Review_Duds\
+- Requires 'pip install opencv-python numpy'\
+\
+V5.0 (Burst Stacker) Update:\
+- Adds '--group-bursts' / '-b' flag to find and group visually similar images.\
+- Requires 'pip install imagehash'\
+"""\
+\
+import os\
+import json\
+import base64\
+import requests\
+import shutil\
+import tempfile\
+from pathlib import Path\
+from datetime import datetime\
+from concurrent.futures import ThreadPoolExecutor, as_completed\
+from typing import Optional, Tuple, List, Dict\
+from collections import defaultdict, Counter\
+import re\
+import subprocess\
+import sys\
+import math\
+from io import BytesIO\
+\
+# --- V5.0: Burst Stacker Imports ---\
+V5_LIBS_MSG = "\uc0\u10060  FATAL: '--group-bursts' requires the 'imagehash' library.\\n   Please run: pip install imagehash"\
+try:\
+    import imagehash\
+    from PIL import Image, ImageFile\
+    ImageFile.LOAD_TRUNCATED_IMAGES = True\
+    V5_LIBS_AVAILABLE = True\
+except ImportError:\
+    V5_LIBS_AVAILABLE = False\
+\
+# --- V6.0: Cull Mode Imports ---\
+V6_LIBS_MSG = "\uc0\u10060  FATAL: '--cull' or '--prep' requires 'opencv-python' and 'numpy'.\\n   Please run: pip install opencv-python numpy"\
+try:\
+    import cv2\
+    import numpy as np\
+    V6_CULL_LIBS_AVAILABLE = True\
+except ImportError:\
+    V6_CULL_LIBS_AVAILABLE = False\
+\
+# --- V6.4: EXIF Stats Imports ---\
+V6_4_LIBS_MSG = "\uc0\u10060  FATAL: '--stats' requires the 'exifread' library.\\n   Please run: pip install exifread"\
+try:\
+    import exifread\
+    V6_4_EXIF_LIBS_AVAILABLE = True\
+except ImportError:\
+    V6_4_EXIF_LIBS_AVAILABLE = False\
+\
+# Try to import tqdm for progress bar\
+try:\
+    from tqdm import tqdm\
+    TQDM_AVAILABLE = True\
+except ImportError:\
+    TQDM_AVAILABLE = False\
+    print("\uc0\u55357 \u56481  Tip: Install tqdm for progress bars: pip3 install tqdm")\
+\
+# Check if dcraw is available for RAW support\
+def check_dcraw():\
+    """Check if dcraw is available"""\
+    try:\
+        result = subprocess.run(['which', 'dcraw'], capture_output=True, text=True)\
+        return result.returncode == 0 and result.stdout.strip()\
+    except Exception:\
+        return False\
+\
+RAW_SUPPORT = check_dcraw()\
+\
+# --- Configuration ---\
+OLLAMA_URL = "http://localhost:11434/api/chat"\
+DEFAULT_MODEL_NAME = "bakllava"\
+DEFAULT_DESTINATION_BASE = Path.home() / "Library/Mobile Documents/com~apple~CloudDocs/negatives"\
+\
+SUPPORTED_EXTENSIONS = \{'.jpg', '.jpeg', '.png'\}\
+if RAW_SUPPORT:\
+    SUPPORTED_EXTENSIONS.add('.rw2')\
+MAX_WORKERS = 5\
+TIMEOUT = 60  # seconds per image\
+\
+# Session date for organizing this batch\
+SESSION_DATE = datetime.now().strftime("%Y-%m-%d")\
+SESSION_TIMESTAMP = datetime.now().strftime("%Y-%m-%d_%H%M")\
+\
+# Keywords for grouping (you can customize these!)\
+GROUP_KEYWORDS = \{\
+    "Architecture": ["building", "architecture", "structure", "facade", "construction", "tower", "bridge", "monument"],\
+    "Street-Scenes": ["street", "road", "sidewalk", "crosswalk", "traffic", "urban", "city"],\
+    "People": ["people", "person", "man", "woman", "child", "crowd", "pedestrian", "walking"],\
+    "Nature": ["tree", "forest", "mountain", "lake", "river", "ocean", "beach", "sunset", "sunrise", "sky", "cloud"],\
+    "Transportation": ["car", "bus", "train", "trolley", "vehicle", "bicycle", "scooter", "motorcycle"],\
+    "Signs-Text": ["sign", "text", "billboard", "poster", "graffiti", "writing"],\
+    "Food-Dining": ["food", "restaurant", "cafe", "produce", "market", "vendor", "stand"],\
+    "Animals": ["dog", "cat", "bird", "animal", "pet"],\
+    "Interior": ["interior", "room", "inside", "indoor"],\
+\}\
+\
+# --- V5.0: Burst Stacker Configuration ---\
+BURST_SIMILARITY_THRESHOLD = 8\
+\
+# --- V6.0: Cull Mode Configuration ---\
+# Calibrated thresholds based on real Lumix .RW2 testing:\
+# - Sharpness >40: Keepers (landscapes, good focus)\
+# - Sharpness <15: Duds (motion blur, missed focus)\
+# - Exposure >20%: Duds (significant clipping)\
+# - Exposure <5%: Good (minimal clipping)\
+CULL_THRESHOLDS = \{\
+    'sharpness_good': 40.0,\
+    'sharpness_dud': 15.0,\
+    'exposure_dud_pct': 0.20,\
+    'exposure_good_pct': 0.05\
+\}\
+\
+# --- V6.2: "Best Pick" Prefix ---\
+BEST_PICK_PREFIX = "_PICK_"\
+\
+# --- V6.3: Smart Prep ---\
+PREP_FOLDER_NAME = "_ReadyForLightroom"\
+\
+\
+def get_available_models() -> Optional[List[str]]:\
+    """\
+    Get list of available Ollama models.\
+    Returns None if Ollama is unavailable (fail-fast check).\
+    """\
+    try:\
+        result = subprocess.run(['ollama', 'list'], capture_output=True, text=True, check=True)\
+        lines = result.stdout.strip().split('\\n')[1:]  # Skip header\
+        models = [line.split()[0] for line in lines if line.strip()]\
+        return models\
+    except subprocess.CalledProcessError:\
+        return None\
+    except FileNotFoundError:\
+        return None\
+    except Exception:\
+        return None\
+\
+\
+def convert_raw_to_jpeg(raw_path: Path) -> Optional[bytes]:\
+    """Convert RAW file to JPEG bytes using dcraw"""\
+    if not RAW_SUPPORT:\
+        return None\
+    \
+    try:\
+        with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp:\
+            tmp_jpg = tmp.name\
+        \
+        result = subprocess.run(\
+            ['dcraw', '-c', '-w', '-q', '3', str(raw_path)],\
+            capture_output=True,\
+            check=True\
+        )\
+        \
+        with tempfile.NamedTemporaryFile(suffix='.ppm', delete=False) as ppm_tmp:\
+            ppm_tmp.write(result.stdout)\
+            ppm_file = ppm_tmp.name\
+        \
+        subprocess.run(\
+            ['sips', '-s', 'format', 'jpeg', ppm_file, '--out', tmp_jpg],\
+            capture_output=True,\
+            check=True\
+        )\
+        \
+        with open(tmp_jpg, 'rb') as f:\
+            jpeg_bytes = f.read()\
+        \
+        os.unlink(ppm_file)\
+        os.unlink(tmp_jpg)\
+        \
+        return jpeg_bytes\
+    \
+    except Exception as e:\
+        print(f"\uc0\u10060  Error converting RAW file: \{e\}")\
+        try:\
+            if 'ppm_file' in locals():\
+                os.unlink(ppm_file)\
+            if 'tmp_jpg' in locals() and os.path.exists(tmp_jpg):\
+                os.unlink(tmp_jpg)\
+        except:\
+            pass\
+        return None\
+\
+\
+def encode_image(image_path: Path) -> Optional[str]:\
+    """Convert image to base64 string, handling RAW files"""\
+    try:\
+        if image_path.suffix.lower() == '.rw2':\
+            jpeg_bytes = convert_raw_to_jpeg(image_path)\
+            if jpeg_bytes:\
+                return base64.b64encode(jpeg_bytes).decode('utf-8')\
+            else:\
+                return None\
+        \
+        with open(image_path, 'rb') as img_file:\
+            return base64.b64encode(img_file.read()).decode('utf-8')\
+    \
+    except Exception as e:\
+        print(f"\uc0\u10060  Error encoding \{image_path.name\}: \{e\}")\
+        return None\
+\
+\
+def get_image_hash(image_path: Path) -> Optional[tuple[Path, imagehash.ImageHash]]:\
+    """\
+    Calculates perceptual hash (visual fingerprint) of an image.\
+    V6.5: Simplified RAW thumbnail extraction.\
+    """\
+    if image_path.suffix.lower() in ['.rw2', '.cr2', '.nef', '.arw', '.dng']:\
+        try:\
+            # Extract embedded JPEG thumbnail directly\
+            result = subprocess.run(\
+                ['dcraw', '-e', '-c', str(image_path)],\
+                capture_output=True,\
+                check=True\
+            )\
+            # PIL can read JPEG from memory\
+            img = Image.open(BytesIO(result.stdout))\
+            return image_path, imagehash.phash(img)\
+        except Exception:\
+            return image_path, None\
+           \
+    # For regular JPG/PNG files\
+    try:\
+        with Image.open(image_path) as img:\
+            return image_path, imagehash.phash(img)\
+    except Exception as e:\
+        print(f"   \uc0\u9888 \u65039   Skipping hash for \{image_path.name\}: \{e\}")\
+        return image_path, None\
+\
+\
+def get_ai_description(image_path: Path, model_name: str) -> Optional[str]:\
+    """Get filename suggestion from vision model"""\
+    base64_image = encode_image(image_path)\
+    if not base64_image:\
+        return None\
+    \
+    payload = \{\
+        "model": model_name,\
+        "messages": [\
+            \{\
+                "role": "user",\
+                "content": "What is in this image? Describe it concisely for a file name.",\
+                "images": [base64_image]\
+            \}\
+        ],\
+        "stream": False\
+    \}\
+    \
+    try:\
+        response = requests.post(OLLAMA_URL, json=payload, timeout=TIMEOUT)\
+        response.raise_for_status()\
+        \
+        result = response.json()\
+        description = result['message']['content'].strip()\
+        \
+        return description\
+        \
+    except requests.exceptions.Timeout:\
+        print(f"\uc0\u9201 \u65039   Timeout processing \{image_path.name\}")\
+        return None\
+    except Exception as e:\
+        print(f"\uc0\u10060  Error processing \{image_path.name\}: \{e\}")\
+        return None\
+\
+\
+def clean_filename(description: str) -> str:\
+    """Convert AI description to clean filename"""\
+    clean = description.strip('"\\'.,!?')\
+    clean = re.sub(r'[^\\w\\s-]', '', clean)\
+    clean = re.sub(r'[-\\s]+', '-', clean)\
+    clean = clean.lower()[:60]\
+    return clean.strip('-')\
+\
+\
+def get_unique_filename(base_name: str, extension: str, destination: Path) -> Path:\
+    """Generate unique filename if file already exists"""\
+    filename = destination / f"\{base_name\}\{extension\}"\
+    \
+    if not filename.exists():\
+        return filename\
+    \
+    counter = 1\
+    while True:\
+        filename = destination / f"\{base_name\}-\{counter:02d\}\{extension\}"\
+        if not filename.exists():\
+            return filename\
+        counter += 1\
+\
+\
+def categorize_description(description: str) -> str:\
+    """Determine category based on keywords in description"""\
+    description_lower = description.lower()\
+    \
+    category_scores = \{\}\
+    for category, keywords in GROUP_KEYWORDS.items():\
+        score = sum(1 for keyword in keywords if keyword in description_lower)\
+        if score > 0:\
+            category_scores[category] = score\
+    \
+    if category_scores:\
+        return max(category_scores, key=category_scores.get)\
+    return "Miscellaneous"\
+\
+\
+def process_single_image(image_path: Path, destination_base: Path, model_name: str, dry_run: bool) -> Tuple[Path, bool, str, str]:\
+    """Process one image: get description, rename, move to temp location"""\
+    try:\
+        description = get_ai_description(image_path, model_name)\
+        if not description:\
+            return image_path, False, "Failed to get AI description", ""\
+        \
+        clean_name = clean_filename(description)\
+        if not clean_name:\
+            clean_name = f"image-\{datetime.now().strftime('%Y%m%d-%H%M%S')\}"\
+        \
+        extension = image_path.suffix.lower()\
+        new_path = get_unique_filename(clean_name, extension, destination_base)\
+        \
+        if not dry_run:\
+            shutil.move(str(image_path), str(new_path))\
+        \
+        return image_path, True, new_path.name, description\
+        \
+    except Exception as e:\
+        return image_path, False, str(e), ""\
+\
+\
+def organize_into_folders(processed_files: List[Dict], destination_base: Path, dry_run: bool):\
+    """Group files into folders based on their descriptions"""\
+    print(f"\\n\{'='*60\}")\
+    print("\uc0\u55357 \u56513  Organizing into smart folders...")\
+    print(f"\{'='*60\}\\n")\
+    \
+    categories = defaultdict(list)\
+    for file_info in processed_files:\
+        filename = file_info['new_name']\
+        description = file_info['description']\
+        category = categorize_description(description)\
+        categories[category].append(\{\
+            'filename': filename,\
+            'description': description\
+        \})\
+    \
+    for category, files in categories.items():\
+        folder_name = f"\{SESSION_DATE\}_\{category\}"\
+        folder_path = destination_base / folder_name\
+        \
+        if not dry_run:\
+            folder_path.mkdir(exist_ok=True)\
+        \
+        print(f"\uc0\u55357 \u56514  \{folder_name\}/ (\{len(files)\} files)")\
+        \
+        for file_info in files:\
+            src = destination_base / file_info['filename']\
+            dst = folder_path / file_info['filename']\
+            \
+            if not dry_run:\
+                if src.exists():\
+                    shutil.move(str(src), str(dst))\
+            else:\
+                print(f"   [PREVIEW] Would move \{file_info['filename']\} here")\
+    \
+    print(f"\\n\uc0\u10024  Organized into \{len(categories)\} folders")\
+\
+\
+def process_directory(directory: Path, destination_base: Path, model_name: str, dry_run: bool, max_workers: int = MAX_WORKERS):\
+    """(DEFAULT MODE) Process all images with AI, rename, and organize"""\
+    \
+    image_files = [\
+        f for f in directory.iterdir() \
+        if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS\
+    ]\
+    \
+    if not image_files:\
+        print("\uc0\u9888 \u65039   No supported image files found in current directory")\
+        print(f"   Looking for: \{', '.join(SUPPORTED_EXTENSIONS)\}")\
+        return\
+    \
+    print(f"\\n\uc0\u55357 \u56568  Found \{len(image_files)\} images to process")\
+    print(f"\uc0\u55356 \u57263  Destination: \{destination_base\}")\
+    print(f"\uc0\u55358 \u56598  Model: \{model_name\}")\
+    print(f"\uc0\u9881 \u65039   Using \{max_workers\} concurrent workers")\
+    if RAW_SUPPORT:\
+        print("\uc0\u9989  RAW support enabled (dcraw)")\
+    print(f"\{'='*60\}\\n")\
+    \
+    results = \{"success": [], "failed": []\}\
+    \
+    if TQDM_AVAILABLE:\
+        pbar = tqdm(total=len(image_files), desc="\uc0\u55356 \u57256  Processing images", unit="img", ncols=80)\
+    \
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:\
+        future_to_file = \{\
+            executor.submit(process_single_image, img, destination_base, model_name, dry_run): img \
+            for img in image_files\
+        \}\
+        \
+        for future in as_completed(future_to_file):\
+            original, success, message, description = future.result()\
+            \
+            if success:\
+                results["success"].append(\{\
+                    "original": original.name,\
+                    "new_name": message,\
+                    "description": description\
+                \})\
+            else:\
+                results["failed"].append((original.name, message))\
+                if TQDM_AVAILABLE:\
+                    pbar.write(f"\uc0\u10060  \{original.name\}: \{message\}")\
+                else:\
+                    print(f"\uc0\u10060  \{original.name\}: \{message\}")\
+            \
+            if TQDM_AVAILABLE:\
+                pbar.update(1)\
+    \
+    if TQDM_AVAILABLE:\
+        pbar.close()\
+    \
+    print(f"\\n\{'='*60\}")\
+    print(f"\uc0\u9989  Successfully processed: \{len(results['success'])\}")\
+    print(f"\uc0\u10060  Failed: \{len(results['failed'])\}")\
+    \
+    if results["failed"]:\
+        print("\\n\uc0\u9888 \u65039   Failed files:")\
+        for orig, reason in results["failed"]:\
+            print(f"   \'95 \{orig\}: \{reason\}")\
+    \
+    if results["success"]:\
+        organize_into_folders(results["success"], destination_base, dry_run)\
+    \
+    log_file = destination_base / f"_import_log_\{SESSION_TIMESTAMP\}.json"\
+    \
+    if not dry_run:\
+        with open(log_file, 'w') as f:\
+            json.dump(\{\
+                "session_date": SESSION_TIMESTAMP,\
+                "source_directory": str(directory),\
+                "destination_directory": str(destination_base),\
+                "model_used": model_name,\
+                "total_files": len(image_files),\
+                "successful": results["success"],\
+                "failed": [\{"original": o, "reason": r\} for o, r in results["failed"]],\
+            \}, f, indent=2)\
+        \
+        print(f"\\n\uc0\u55357 \u56541  Log saved: \{log_file.name\}")\
+    else:\
+        print(f"\\n[PREVIEW] Would save log file to: \{log_file.name\}")\
+\
+\
+def group_bursts_in_directory(directory: Path, dry_run: bool, max_workers: int = MAX_WORKERS):\
+    """\
+    (V6.2) Finds and groups visually similar images into subfolders\
+    and renames the sharpest file in the burst.\
+    """\
+    \
+    print(f"\\n\uc0\u55356 \u57256  BakLLaVA Photo Organizer --- (Burst Stacker Mode)")\
+    print(f"\uc0\u55357 \u56568  Scanning for visually similar images in: \{directory\}")\
+    print(f"   (Similarity threshold: \{BURST_SIMILARITY_THRESHOLD\})")\
+    print(f"   (Sharpest image will be prefixed: \{BEST_PICK_PREFIX\})")\
+    \
+    image_files = [\
+        f for f in directory.iterdir() \
+        if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS\
+    ]\
+    \
+    if len(image_files) < 2:\
+        print("   \uc0\u9888 \u65039   Not enough images to compare. Exiting.")\
+        return\
+\
+    all_hashes = \{\}\
+    print("\\n\uc0\u55357 \u56620  Calculating visual fingerprints...")\
+    \
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:\
+        future_to_path = \{executor.submit(get_image_hash, path): path for path in image_files\}\
+        \
+        iterable = as_completed(future_to_path)\
+        if TQDM_AVAILABLE:\
+            iterable = tqdm(iterable, total=len(image_files), desc="   Hashing", unit="img")\
+\
+        for future in iterable:\
+            path, img_hash = future.result()\
+            if img_hash:\
+                all_hashes[path] = img_hash\
+\
+    print("\\n\uc0\u55358 \u56812  Comparing fingerprints to find burst groups...")\
+    \
+    visited_paths = set()\
+    all_burst_groups = []\
+    \
+    sorted_paths = sorted(all_hashes.keys(), key=lambda p: p.name)\
+    \
+    for path in sorted_paths:\
+        if path in visited_paths:\
+            continue\
+            \
+        current_group = [path]\
+        visited_paths.add(path)\
+        \
+        for other_path in sorted_paths:\
+            if other_path in visited_paths:\
+                continue\
+                \
+            hash1 = all_hashes.get(path)\
+            hash2 = all_hashes.get(other_path)\
+            \
+            if hash1 and hash2:\
+                distance = hash1 - hash2\
+                if distance <= BURST_SIMILARITY_THRESHOLD:\
+                    current_group.append(other_path)\
+                    visited_paths.add(other_path)\
+        \
+        if len(current_group) > 1:\
+            all_burst_groups.append(current_group)\
+\
+    if not all_burst_groups:\
+        print("\\n\uc0\u9989  No burst groups found. All images are unique!")\
+        return\
+        \
+    print(f"\\n\uc0\u55357 \u56620  Found \{len(all_burst_groups)\} burst groups. Analyzing for best pick...")\
+    \
+    best_picks: Dict[int, Tuple[Path, float]] = \{\}\
+    \
+    group_iterable = all_burst_groups\
+    if TQDM_AVAILABLE:\
+        group_iterable = tqdm(all_burst_groups, total=len(all_burst_groups), desc="   Analyzing bursts", unit="burst")\
+\
+    for i, group in enumerate(group_iterable):\
+        best_sharpness = -1.0\
+        best_file = None\
+        \
+        for file_path in group:\
+            image_bytes = get_image_bytes_for_analysis(file_path)\
+            if image_bytes:\
+                scores = analyze_image_quality(image_bytes)\
+                sharpness = scores.get('sharpness', 0.0)\
+                \
+                if sharpness > best_sharpness:\
+                    best_sharpness = sharpness\
+                    best_file = file_path\
+        \
+        if best_file:\
+            best_picks[i] = (best_file, best_sharpness)\
+\
+    print(f"\\n\uc0\u55357 \u56513  Stacking \{len(all_burst_groups)\} burst groups...")\
+    \
+    for i, group in enumerate(all_burst_groups):\
+        folder_name = f"burst-\{i+1:03d\}"\
+        folder_path = directory / folder_name\
+        \
+        print(f"\\n\uc0\u55357 \u56514  \{folder_name\}/ (\{len(group)\} files)")\
+        \
+        if not dry_run:\
+            folder_path.mkdir(exist_ok=True)\
+            \
+        winner_data = best_picks.get(i)\
+        \
+        for file_path in group:\
+            if winner_data and file_path == winner_data[0]:\
+                new_name = f"\{BEST_PICK_PREFIX\}\{file_path.name\}"\
+            else:\
+                new_name = file_path.name\
+                \
+            new_file_path = folder_path / new_name\
+            \
+            if not dry_run:\
+                try:\
+                    shutil.move(str(file_path), str(new_file_path))\
+                    print(f"   \uc0\u8594  Moved \{file_path.name\} \u8594  \{new_name\}")\
+                except Exception as e:\
+                    print(f"   \uc0\u10060  FAILED to move \{file_path.name\}: \{e\}")\
+            else:\
+                if winner_data and file_path == winner_data[0]:\
+                    print(f"   [PREVIEW] Would move and RENAME \{file_path.name\} to \{new_name\}")\
+                else:\
+                    print(f"   [PREVIEW] Would move \{file_path.name\} to \{folder_name\}/")\
+\
+    print("\\n\uc0\u10024  Burst stacking complete!")\
+\
+\
+def analyze_image_quality(image_bytes: bytes) -> Dict[str, float]:\
+    """\
+    Analyzes image bytes for sharpness and exposure.\
+    Core engine reused by cull, burst, and prep features.\
+    """\
+    scores = \{\
+        'sharpness': 0.0,\
+        'blacks_pct': 0.0,\
+        'whites_pct': 0.0\
+    \}\
+    try:\
+        np_arr = np.frombuffer(image_bytes, np.uint8)\
+        img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)\
+        \
+        if img is None:\
+            return scores\
+\
+        # Sharpness (Laplacian variance)\
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)\
+        laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()\
+        scores['sharpness'] = float(laplacian_var)\
+\
+        # Exposure (histogram for clipped pixels)\
+        total_pixels = gray.size\
+        crushed_blacks = np.sum(gray < 10)\
+        scores['blacks_pct'] = float(crushed_blacks / total_pixels)\
+        blown_whites = np.sum(gray > 245)\
+        scores['whites_pct'] = float(blown_whites / total_pixels)\
+\
+        return scores\
+        \
+    except Exception:\
+        return scores\
+\
+\
+def get_image_bytes_for_analysis(image_path: Path) -> Optional[bytes]:\
+    """Helper to get bytes from any supported file"""\
+    ext = image_path.suffix.lower()\
+    if ext == '.rw2':\
+        return convert_raw_to_jpeg(image_path)\
+    elif ext in ('.jpg', '.jpeg', '.png'):\
+        try:\
+            with open(image_path, 'rb') as f:\
+                return f.read()\
+        except Exception as e:\
+            print(f"   \uc0\u10060  Failed to read \{image_path.name\}: \{e\}")\
+            return None\
+    return None\
+\
+\
+def process_image_for_culling(image_path: Path) -> Tuple[Path, Optional[Dict[str, float]]]:\
+    """Thread-pool worker: Gets bytes and runs analysis engine"""\
+    image_bytes = get_image_bytes_for_analysis(image_path)\
+    if not image_bytes:\
+        return image_path, None\
+    \
+    scores = analyze_image_quality(image_bytes)\
+    return image_path, scores\
+\
+\
+def cull_images_in_directory(directory: Path, dry_run: bool, max_workers: int = MAX_WORKERS):\
+    """(V6.0) Finds and groups images by technical quality"""\
+    \
+    print(f"\\n\uc0\u55356 \u57256  BakLLaVA Photo Organizer --- (Cull Mode)")\
+    print(f"\uc0\u55357 \u56620  Analyzing technical quality in: \{directory\}")\
+    \
+    image_files = [\
+        f for f in directory.iterdir() \
+        if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS\
+    ]\
+    \
+    if not image_files:\
+        print("   \uc0\u9888 \u65039   No supported images to analyze. Exiting.")\
+        return\
+\
+    all_scores = \{\}\
+    print("\\n\uc0\u9881 \u65039   Analyzing sharpness and exposure...")\
+    \
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:\
+        future_to_path = \{\
+            executor.submit(process_image_for_culling, path): path \
+            for path in image_files\
+        \}\
+        \
+        iterable = as_completed(future_to_path)\
+        if TQDM_AVAILABLE:\
+            iterable = tqdm(iterable, total=len(image_files), desc="   Analyzing", unit="img")\
+\
+        for future in iterable:\
+            path, scores = future.result()\
+            if scores:\
+                all_scores[path] = scores\
+\
+    print("\\n\uc0\u9878 \u65039   Triaging images into quality tiers...")\
+    \
+    th = CULL_THRESHOLDS\
+    tiers = \{"Good": [], "Maybe": [], "Dud": []\}\
+    log_data = []\
+\
+    for path, scores in all_scores.items():\
+        sharp = scores['sharpness']\
+        blacks = scores['blacks_pct']\
+        whites = scores['whites_pct']\
+        \
+        is_exposure_bad = (blacks > th['exposure_dud_pct']) or (whites > th['exposure_dud_pct'])\
+        is_exposure_good = (blacks < th['exposure_good_pct']) and (whites < th['exposure_good_pct'])\
+        is_sharp_bad = sharp < th['sharpness_dud']\
+        is_sharp_good = sharp > th['sharpness_good']\
+\
+        tier = "Maybe"\
+        if is_sharp_bad or is_exposure_bad:\
+            tier = "Dud"\
+        elif is_sharp_good and is_exposure_good:\
+            tier = "Good"\
+        \
+        tiers[tier].append(path)\
+        log_data.append(\{\
+            'file': path.name,\
+            'tier': tier,\
+            'sharpness': round(sharp, 2),\
+            'blacks_pct': round(blacks, 4),\
+            'whites_pct': round(whites, 4)\
+        \})\
+\
+    print(f"\\n\uc0\u55357 \u56522  Found \{len(tiers['Good'])\} Keepers, \{len(tiers['Maybe'])\} Maybes, and \{len(tiers['Dud'])\} Duds.")\
+    \
+    folder_map = \{\
+        "Good": directory / "_Keepers",\
+        "Maybe": directory / "_Review_Maybe",\
+        "Dud": directory / "_Review_Duds"\
+    \}\
+    \
+    for tier, paths in tiers.items():\
+        if not paths:\
+            continue\
+            \
+        folder_path = folder_map[tier]\
+        print(f"\\n\uc0\u55357 \u56514  \{folder_path.name\}/ (\{len(paths)\} files)")\
+        \
+        if not dry_run:\
+            folder_path.mkdir(exist_ok=True)\
+            \
+        for file_path in paths:\
+            new_file_path = folder_path / file_path.name\
+            if not dry_run:\
+                try:\
+                    shutil.move(str(file_path), str(new_file_path))\
+                    print(f"   \uc0\u8594  Moved \{file_path.name\}")\
+                except Exception as e:\
+                    print(f"   \uc0\u10060  FAILED to move \{file_path.name\}: \{e\}")\
+            else:\
+                print(f"   [PREVIEW] Would move \{file_path.name\} to \{folder_path.name\}/")\
+\
+    log_file = directory / f"_cull_log_\{SESSION_TIMESTAMP\}.json"\
+    \
+    try:\
+        with open(log_file, 'w') as f:\
+            json.dump(\{\
+                "session_date": SESSION_TIMESTAMP,\
+                "source_directory": str(directory),\
+                "thresholds_used": CULL_THRESHOLDS,\
+                "analysis": sorted(log_data, key=lambda x: x['sharpness'])\
+            \}, f, indent=2)\
+        \
+        if dry_run:\
+            print(f"\\n\uc0\u55357 \u56541  [PREVIEW] Calibration log saved: \{log_file.name\}")\
+        else:\
+            print(f"\\n\uc0\u55357 \u56541  Cull log saved: \{log_file.name\}")\
+            \
+    except Exception as e:\
+        print(f"\\n\uc0\u10060  FAILED to save log file: \{e\}")\
+\
+    print("\\n\uc0\u10024  Culling complete!")\
+\
+\
+def prep_smart_export(directory: Path, dry_run: bool, max_workers: int = MAX_WORKERS):\
+    """(V6.3) Finds all "Good" tier images and COPIES them to prep folder"""\
+    \
+    print(f"\\n\uc0\u55356 \u57256  BakLLaVA Photo Organizer --- (Smart Prep Mode)")\
+    print(f"\uc0\u55357 \u56590  Finding 'Keepers' to copy to: \{PREP_FOLDER_NAME\}/")\
+    \
+    image_files = [\
+        f for f in directory.iterdir() \
+        if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS\
+    ]\
+    \
+    if not image_files:\
+        print("   \uc0\u9888 \u65039   No supported images to analyze. Exiting.")\
+        return\
+\
+    all_scores = \{\}\
+    print("\\n\uc0\u9881 \u65039   Analyzing technical quality...")\
+    \
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:\
+        future_to_path = \{\
+            executor.submit(process_image_for_culling, path): path \
+            for path in image_files\
+        \}\
+        \
+        iterable = as_completed(future_to_path)\
+        if TQDM_AVAILABLE:\
+            iterable = tqdm(iterable, total=len(image_files), desc="   Analyzing", unit="img")\
+\
+        for future in iterable:\
+            path, scores = future.result()\
+            if scores:\
+                all_scores[path] = scores\
+\
+    print("\\n\uc0\u9878 \u65039   Finding 'Good' tier images...")\
+    \
+    th = CULL_THRESHOLDS\
+    good_files = []\
+\
+    for path, scores in all_scores.items():\
+        sharp = scores['sharpness']\
+        blacks = scores['blacks_pct']\
+        whites = scores['whites_pct']\
+        \
+        is_exposure_good = (blacks < th['exposure_good_pct']) and (whites < th['exposure_good_pct'])\
+        is_sharp_good = sharp > th['sharpness_good']\
+\
+        if is_sharp_good and is_exposure_good:\
+            good_files.append(path)\
+\
+    if not good_files:\
+        print("\\n\uc0\u9989  No 'Keepers' found that meet the 'Good' tier criteria.")\
+        print("   (Try adjusting CULL_THRESHOLDS if this seems wrong)")\
+        return\
+\
+    print(f"\\n\uc0\u55357 \u56522  Found \{len(good_files)\} 'Keepers' to copy.")\
+    \
+    folder_path = directory / PREP_FOLDER_NAME\
+    \
+    if not dry_run:\
+        folder_path.mkdir(exist_ok=True)\
+            \
+    for file_path in good_files:\
+        new_file_path = folder_path / file_path.name\
+        if not dry_run:\
+            try:\
+                shutil.copy2(str(file_path), str(new_file_path))\
+                print(f"   \uc0\u8594  Copied \{file_path.name\}")\
+            except Exception as e:\
+                print(f"   \uc0\u10060  FAILED to copy \{file_path.name\}: \{e\}")\
+        else:\
+            print(f"   [PREVIEW] Would copy \{file_path.name\} to \{folder_path.name\}/")\
+\
+    print("\\n\uc0\u10024  Smart Prep complete!")\
+\
+\
+def format_duration(duration: datetime.timedelta) -> str:\
+    """Converts timedelta to readable string like '1d 4h 15m'"""\
+    total_seconds = int(duration.total_seconds())\
+    days, remainder = divmod(total_seconds, 86400)\
+    hours, remainder = divmod(remainder, 3600)\
+    minutes, _ = divmod(remainder, 60)\
+    \
+    parts = []\
+    if days > 0:\
+        parts.append(f"\{days\}d")\
+    if hours > 0:\
+        parts.append(f"\{hours\}h")\
+    if minutes > 0 or (days == 0 and hours == 0):\
+        parts.append(f"\{minutes\}m")\
+        \
+    return " ".join(parts) if parts else "0m"\
+\
+\
+def generate_bar_chart(data: dict, bar_width: int = 25, bar_char: str = "\uc0\u9608 ") -> List[str]:\
+    """Generates ASCII bar chart lines from a dictionary"""\
+    output_lines = []\
+    if not data:\
+        return output_lines\
+        \
+    max_val = max(data.values())\
+    if max_val == 0:\
+        max_val = 1\
+        \
+    max_key_len = max(len(key) for key in data.keys())\
+    \
+    for key, val in data.items():\
+        bar_len = int(math.ceil((val / max_val) * bar_width))\
+        bar = bar_char * bar_len\
+        line = f"   \{key.ljust(max_key_len)\}: \{str(val).ljust(4)\} \{bar\}"\
+        output_lines.append(line)\
+        \
+    return output_lines\
+\
+\
+def analyze_single_exif(image_path: Path) -> Optional[Dict]:\
+    """\
+    Thread-pool worker: Opens image and extracts key EXIF data.\
+    V6.4.2: Intelligently calculates aperture ratios.\
+    """\
+    try:\
+        with open(image_path, 'rb') as f:\
+            tags = exifread.process_file(f, details=False, stop_tag='EXIF DateTimeOriginal')\
+\
+            if not tags or 'EXIF DateTimeOriginal' not in tags:\
+                return None\
+\
+            timestamp_str = str(tags['EXIF DateTimeOriginal'])\
+            dt_obj = datetime.strptime(timestamp_str, '%Y:%m:%d %H:%M:%S')\
+\
+            camera = str(tags.get('Image Model', 'Unknown')).strip()\
+            focal_len = str(tags.get('EXIF FocalLength', 'Unknown')).split(' ')[0]\
+            \
+            aperture_str = "Unknown"\
+            aperture_tag = tags.get('EXIF FNumber')\
+            \
+            if aperture_tag:\
+                val = aperture_tag.values[0]\
+                \
+                if hasattr(val, 'num') and hasattr(val, 'den'):\
+                    if val.den == 0:\
+                        aperture_val = 0.0\
+                    else:\
+                        aperture_val = float(val.num) / float(val.den)\
+                    aperture_str = f"f/\{aperture_val:.1f\}"\
+                else:\
+                    aperture_str = f"f/\{val:.1f\}"\
+\
+            if not camera: camera = "Unknown"\
+            if not focal_len: focal_len = "Unknown"\
+            if aperture_str == "f/0.0": aperture_str = "Unknown"\
+\
+            return \{\
+                'timestamp': dt_obj,\
+                'camera': camera,\
+                'focal_length': f"\{focal_len\} mm",\
+                'aperture': aperture_str\
+            \}\
+            \
+    except Exception:\
+        return None\
+\
+\
+def show_exif_insights(directory: Path, dry_run: bool, max_workers: int = MAX_WORKERS):\
+    """(V6.4) Scans images, aggregates EXIF data, prints summary"""\
+    \
+    print(f"\\n\uc0\u55356 \u57256  BakLLaVA Photo Organizer --- (EXIF Stats Mode)")\
+    print(f"\uc0\u55357 \u56522  Scanning EXIF data in: \{directory\}")\
+    \
+    image_files = [\
+        f for f in directory.iterdir() \
+        if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS\
+    ]\
+    \
+    if not image_files:\
+        print("   \uc0\u9888 \u65039   No supported images to analyze. Exiting.")\
+        return\
+\
+    all_stats = []\
+    print("\\n\uc0\u9881 \u65039   Reading EXIF data...")\
+    \
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:\
+        future_to_path = \{\
+            executor.submit(analyze_single_exif, path): path \
+            for path in image_files\
+        \}\
+        \
+        iterable = as_completed(future_to_path)\
+        if TQDM_AVAILABLE:\
+            iterable = tqdm(iterable, total=len(image_files), desc="   Scanning", unit="img")\
+\
+        for future in iterable:\
+            result_dict = future.result()\
+            if result_dict:\
+                all_stats.append(result_dict)\
+\
+    if not all_stats:\
+        print(f"\\n\uc0\u9888 \u65039   No EXIF data found in \{len(image_files)\} scanned images.")\
+        print("   (Files may be JPEGs with stripped metadata)")\
+        return\
+\
+    print("\uc0\u55357 \u56520  Aggregating statistics...")\
+    \
+    timestamps = sorted([s['timestamp'] for s in all_stats])\
+    start_time = timestamps[0]\
+    end_time = timestamps[-1]\
+    duration = end_time - start_time\
+    duration_str = format_duration(duration)\
+\
+    LIGHTING_TABLE = \{\
+        (0, 4):   "Night",\
+        (5, 7):   "Golden Hour (AM)",\
+        (8, 10):  "Morning",\
+        (11, 13): "Midday",\
+        (14, 16): "Afternoon",\
+        (17, 18): "Golden Hour (PM)",\
+        (19, 21): "Dusk",\
+        (22, 23): "Night",\
+    \}\
+    \
+    lighting_buckets = defaultdict(int)\
+    camera_counter = Counter()\
+    focal_len_counter = Counter()\
+    aperture_counter = Counter()\
+\
+    for stats in all_stats:\
+        hour = stats['timestamp'].hour\
+        for (start, end), name in LIGHTING_TABLE.items():\
+            if start <= hour <= end:\
+                lighting_buckets[name] += 1\
+                break\
+        \
+        camera_counter[stats['camera']] += 1\
+        focal_len_counter[stats['focal_length']] += 1\
+        aperture_counter[stats['aperture']] += 1\
+\
+    log_file_path = directory / f"_exif_summary_\{SESSION_TIMESTAMP\}.json"\
+    \
+    json_report = \{\
+        "session_story": \{\
+            "start_time": start_time.isoformat(),\
+            "end_time": end_time.isoformat(),\
+            "duration_str": duration_str,\
+            "total_images_scanned": len(image_files),\
+            "images_with_exif": len(all_stats)\
+        \},\
+        "lighting_distribution": dict(lighting_buckets),\
+        "gear_used": \{\
+            "cameras": dict(camera_counter),\
+        \},\
+        "habits": \{\
+            "focal_lengths": dict(focal_len_counter),\
+            "apertures": dict(aperture_counter),\
+        \}\
+    \}\
+    \
+    try:\
+        with open(log_file_path, 'w') as f:\
+            json.dump(json_report, f, indent=2)\
+    except Exception as e:\
+        print(f"\\n\uc0\u9888 \u65039   Warning: Could not save JSON log: \{e\}")\
+\
+    header = f"EXIF INSIGHTS: \{directory.name\}"\
+    print(f"\\n\{'='*60\}")\
+    print(f"\{header:^60\}")\
+    print(f"\{'='*60\}")\
+    \
+    print("\uc0\u55357 \u56517  Session Story:")\
+    print(f"   Started:     \{start_time.strftime('%a, %b %d %Y at %I:%M %p')\}")\
+    print(f"   Ended:       \{end_time.strftime('%a, %b %d %Y at %I:%M %p')\}")\
+    print(f"   Duration:    \{duration_str\}")\
+    print(f"   Total Shots: \{len(image_files)\} (\{len(all_stats)\} with EXIF data)")\
+    print(f"\{'-'*60\}")\
+\
+    print("\uc0\u55356 \u57093  Lighting Conditions:")\
+    bar_lines = generate_bar_chart(lighting_buckets, bar_width=30)\
+    for line in bar_lines:\
+        print(line)\
+    \
+    print("\\n\uc0\u55356 \u57256  Creative Habits (Top 3):")\
+        \
+    print("\\n   \uc0\u55357 \u56567  Cameras:")\
+    for camera, count in camera_counter.most_common(3):\
+        print(f"      \'95 \{camera\}: \{count\}")\
+\
+    print("\\n   \uc0\u55357 \u56621  Focal Lengths (Composition):")\
+    for focal, count in focal_len_counter.most_common(3):\
+        print(f"      \'95 \{focal\}: \{count\}")\
+        \
+    print("\\n   \uc0\u55357 \u56589  Apertures (Depth of Field):")\
+    for aperture, count in aperture_counter.most_common(3):\
+        print(f"      \'95 \{aperture\}: \{count\}")\
+\
+    print(f"\\n\{'='*60\}")\
+    print(f"\uc0\u55357 \u56541  Summary saved to: \{log_file_path.name\}")\
+\
+\
+def get_ingest_config() -> Tuple[Path, str]:\
+    """\
+    V6.5: Helper function to get destination and model from user.\
+    Eliminates code duplication between ingest modes.\
+    Returns (destination_path, model_name).\
+    """\
+    print(f"\\n\uc0\u55356 \u57263  Default archive destination: \{DEFAULT_DESTINATION_BASE\}")\
+    new_dest_path = input("   Press ENTER to use default, or type a new path: ").strip()\
+    \
+    chosen_destination: Path\
+    if not new_dest_path:\
+        chosen_destination = DEFAULT_DESTINATION_BASE\
+        print(f"   \uc0\u9989  Using default destination.")\
+    else:\
+        chosen_destination = Path(new_dest_path).expanduser()\
+        print(f"   \uc0\u9989  Using: \{chosen_destination\}")\
+    \
+    try:\
+        chosen_destination.mkdir(parents=True, exist_ok=True)\
+    except Exception as e:\
+        print(f"\uc0\u10060  Error creating destination folder: \{e\}")\
+        print("   Please check the path and permissions. Exiting.")\
+        sys.exit(1)\
+    \
+    print(f"\\n\uc0\u55358 \u56598  Default model: \{DEFAULT_MODEL_NAME\}")\
+    available_models = get_available_models()\
+    \
+    if available_models is None:\
+        print("\\n\uc0\u10060  FATAL: Could not connect to Ollama server.")\
+        print("   Please ensure Ollama is running.")\
+        sys.exit(1)\
+    \
+    if available_models:\
+        print(f"   Available models: \{', '.join(available_models)\}")\
+    else:\
+        print("   \uc0\u9888 \u65039   No models found. Run 'ollama pull bakllava' to install one.")\
+    \
+    new_model = input("   Press ENTER to use default, or type a model name: ").strip()\
+    \
+    chosen_model: str\
+    if not new_model:\
+        chosen_model = DEFAULT_MODEL_NAME\
+        print(f"   \uc0\u9989  Using default model.")\
+    else:\
+        if available_models and new_model not in available_models:\
+            print(f"   \uc0\u9888 \u65039   Warning: '\{new_model\}' not found in available models.")\
+            print(f"   Available: \{', '.join(available_models)\}")\
+            confirm = input("   Continue anyway? (y/n): ").strip().lower()\
+            if confirm != 'y':\
+                print("Cancelled.")\
+                sys.exit(0)\
+        chosen_model = new_model\
+        print(f"   \uc0\u9989  Using model: \{chosen_model\}")\
+    \
+    return chosen_destination, chosen_model\
+\
+\
+def auto_workflow(directory: Path, dry_run: bool, max_workers: int = MAX_WORKERS):\
+    """\
+    (V6.5) Fully automated workflow: Stack \uc0\u8594  Cull \u8594  AI-Name \u8594  Archive.\
+    V6.5 Update: Asks for config FIRST, then shows stats, then processes.\
+    """\
+    \
+    print("\\n" + "="*60)\
+    print("\uc0\u55356 \u57256  BakLLaVA Photo Organizer --- (Auto Mode)")\
+    print("="*60)\
+    print("This will automatically Stack, Cull, AI-Name, and Archive")\
+    print("all 'hero' photos from this session.")\
+    print("-"*60)\
+\
+    # V6.5 FIX: Ask for configuration FIRST\
+    print("\\n\uc0\u55357 \u56523  Step 1/5: Configuration")\
+    chosen_destination, chosen_model = get_ingest_config()\
+\
+    # Step 2: Stats Preview (read-only)\
+    print("\\n\uc0\u55357 \u56522  Step 2/5: Analyzing session (read-only)...")\
+    try:\
+        show_exif_insights(directory, dry_run=True, max_workers=max_workers)\
+    except Exception as e:\
+        print(f"   \uc0\u9888 \u65039   Could not run EXIF analysis: \{e\}")\
+\
+    # Confirmation gate\
+    print("-"*60)\
+    print(f"\\n\uc0\u55357 \u56513  Source:      \{directory\}")\
+    print(f"\uc0\u55356 \u57263  Destination: \{chosen_destination\}")\
+    print(f"\uc0\u55358 \u56598  Model:       \{chosen_model\}")\
+    confirm = input(f"\\n\uc0\u9654 \u65039   Ready to process? (y/n): ")\
+    if confirm.lower() != 'y':\
+        print("Cancelled.")\
+        return\
+\
+    # Step 3: Group Bursts\
+    print("\\n\uc0\u55357 \u56568  Step 3/5: Stacking burst shots...")\
+    group_bursts_in_directory(directory, dry_run=False, max_workers=max_workers)\
+\
+    # Step 4: Cull Singles\
+    print("\\n\uc0\u55357 \u56620  Step 4/5: Culling single shots...")\
+    cull_images_in_directory(directory, dry_run=False, max_workers=max_workers)\
+\
+    # V6.5 VALIDATION: Check if we have any keepers\
+    keepers_dir = directory / "_Keepers"\
+    if not keepers_dir.exists() or not any(keepers_dir.iterdir()):\
+        print("\\n\uc0\u9888 \u65039   Warning: No '_Keepers' folder found or it's empty.")\
+        print("   Cull may have failed or all images were duds.")\
+\
+    # Step 5: Find and AI-name hero files\
+    print("\\n\uc0\u55358 \u56598  Step 5/5: Finding and archiving 'hero' files...")\
+    \
+    hero_files = []\
+    \
+    # Get keepers\
+    if keepers_dir.is_dir():\
+        for f in keepers_dir.iterdir():\
+            if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS:\
+                hero_files.append(f)\
+    \
+    # Get picks from bursts\
+    for burst_folder in directory.glob("burst-*/"):\
+        if burst_folder.is_dir():\
+            for f in burst_folder.iterdir():\
+                if f.is_file() and f.name.startswith(BEST_PICK_PREFIX):\
+                    hero_files.append(f)\
+\
+    if not hero_files:\
+        print("\\n\uc0\u9888 \u65039   No 'Keepers' or '_PICK_' files found. Nothing to archive.")\
+        print("   Auto workflow complete.")\
+        return\
+\
+    print(f"   Found \{len(hero_files)\} 'hero' files to AI-name and archive.")\
+    \
+    results = \{"success": [], "failed": []\}\
+    \
+    if TQDM_AVAILABLE:\
+        pbar = tqdm(total=len(hero_files), desc="\uc0\u55356 \u57256  Archiving", unit="img", ncols=80)\
+    \
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:\
+        future_to_file = \{\
+            executor.submit(process_single_image, img_path, chosen_destination, chosen_model, dry_run=False): img_path \
+            for img_path in hero_files\
+        \}\
+        \
+        for future in as_completed(future_to_file):\
+            original, success, message, description = future.result()\
+            \
+            if success:\
+                results["success"].append(\{\
+                    "original": original.name,\
+                    "new_name": message,\
+                    "description": description\
+                \})\
+            else:\
+                results["failed"].append((original.name, message))\
+                if TQDM_AVAILABLE:\
+                    pbar.write(f"\uc0\u10060  \{original.name\}: \{message\}")\
+            \
+            if TQDM_AVAILABLE:\
+                pbar.update(1)\
+    \
+    if TQDM_AVAILABLE:\
+        pbar.close()\
+        \
+    print(f"\\n\{'='*60\}")\
+    print(f"\uc0\u9989  Successfully archived: \{len(results['success'])\}")\
+    print(f"\uc0\u10060  Failed to archive: \{len(results['failed'])\}")\
+\
+    if results["success"]:\
+        organize_into_folders(results["success"], chosen_destination, dry_run=False)\
+\
+    print("\\n" + "="*60)\
+    print("\uc0\u10024  AUTO WORKFLOW COMPLETE")\
+    print("="*60)\
+    print(f"\uc0\u55357 \u56514  Your 'hero' photos are now in: \{chosen_destination\}")\
+    print(f"\uc0\u55357 \u56770 \u65039   Remaining 'duds' and 'bursts' are in: \{directory\}")\
+\
+\
+def run_default_ingest(current_dir: Path, dry_run: bool):\
+    """Runs the original V4.1 AI-powered ingest process"""\
+    print("\\n\uc0\u55356 \u57256  BakLLaVA Photo Organizer --- (Ingest Mode)")\
+    print(f"\uc0\u55357 \u56513  Current directory: \{current_dir\}")\
+    \
+    chosen_destination, chosen_model = get_ingest_config()\
+\
+    response = input("\\n\uc0\u9654 \u65039   Process all images in this directory? (y/n): ")\
+    if response.lower() != 'y':\
+        print("Cancelled.")\
+        return\
+    \
+    process_directory(current_dir, chosen_destination, chosen_model, dry_run)\
+\
+\
+def main():\
+    """Main entry point"""\
+    current_dir = Path.cwd()\
+    args = set(sys.argv[1:])\
+    \
+    dry_run = "--preview" in args or "-p" in args\
+    \
+    # V6.5: Updated dispatch table with --auto\
+    DISPATCH_TABLE = \{\
+        '--auto': (auto_workflow, V5_LIBS_AVAILABLE and V6_CULL_LIBS_AVAILABLE, V5_LIBS_MSG if not V5_LIBS_AVAILABLE else V6_LIBS_MSG),\
+        '--group-bursts': (group_bursts_in_directory, V5_LIBS_AVAILABLE, V5_LIBS_MSG),\
+        '-b': (group_bursts_in_directory, V5_LIBS_AVAILABLE, V5_LIBS_MSG),\
+        '--cull': (cull_images_in_directory, V6_CULL_LIBS_AVAILABLE, V6_LIBS_MSG),\
+        '-c': (cull_images_in_directory, V6_CULL_LIBS_AVAILABLE, V6_LIBS_MSG),\
+        '--prep': (prep_smart_export, V6_CULL_LIBS_AVAILABLE, V6_LIBS_MSG),\
+        '--pe': (prep_smart_export, V6_CULL_LIBS_AVAILABLE, V6_LIBS_MSG),\
+        '--stats': (show_exif_insights, V6_4_EXIF_LIBS_AVAILABLE, V6_4_LIBS_MSG),\
+        '--exif': (show_exif_insights, V6_4_EXIF_LIBS_AVAILABLE, V6_4_LIBS_MSG),\
+    \}\
+    \
+    command_to_run = None\
+    for flag in args:\
+        if flag in DISPATCH_TABLE:\
+            command_to_run = flag\
+            break\
+            \
+    if command_to_run:\
+        (func_to_call, libs_ok, lib_msg) = DISPATCH_TABLE[command_to_run]\
+        \
+        if not libs_ok:\
+            print(lib_msg)\
+            return\
+            \
+        if dry_run and command_to_run not in ('--auto',):\
+             print("\\n" + "="*60)\
+             print(f"RUNNING \{command_to_run.upper()\} IN PREVIEW MODE")\
+             print("NO FILES WILL BE MOVED/COPIED")\
+             print("="*60)\
+        \
+        func_to_call(current_dir, dry_run)\
+\
+    else:\
+        if "--help" in args or "-h" in args:\
+             print("\\n\uc0\u55356 \u57256  BakLLaVA Photo Organizer - Usage")\
+             print("\\nCommands:")\
+             print("  --auto           : (RECOMMENDED) Full automated workflow: Stack \uc0\u8594  Cull \u8594  AI-Archive")\
+             print("  <no command>     : (Legacy) AI Ingest on ALL files in current directory")\
+             print("\\nManual Tools:")\
+             print("  --stats, --exif  : Display EXIF insights dashboard")\
+             print("  --group-bursts, -b : Stack visually similar burst shots, mark best pick")\
+             print("  --cull, -c       : Sort images into _Keepers, _Review_Maybe, _Review_Duds")\
+             print("  --prep, --pe     : Find 'Good' images and copy to _ReadyForLightroom")\
+             print("\\nOptions:")\
+             print("  --preview, -p    : Dry run mode (no files moved/copied)")\
+             print("  --help, -h       : Show this help message")\
+             return\
+\
+        if dry_run:\
+            print("\\n" + "="*60)\
+            print("RUNNING LEGACY INGEST IN PREVIEW MODE")\
+            print("NO FILES WILL BE MOVED")\
+            print("="*60)\
+        \
+        run_default_ingest(current_dir, dry_run)\
+    \
+    if dry_run and command_to_run not in ('--auto',):\
+         print("\\n" + "="*60)\
+         print("DRY RUN COMPLETE - NO FILES WERE MOVED")\
+         print("="*60)\
+    else:\
+        print("\\n\uc0\u10024  Done!\\n")\
+\
+\
+if __name__ == "__main__":\
+    main()}

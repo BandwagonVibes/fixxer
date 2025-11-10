@@ -1,0 +1,42 @@
+{\rtf1\ansi\ansicpg1252\cocoartf2822
+\cocoatextscaling0\cocoaplatform0{\fonttbl\f0\fswiss\fcharset0 Helvetica;}
+{\colortbl;\red255\green255\blue255;}
+{\*\expandedcolortbl;;}
+\margl1440\margr1440\vieww11520\viewh8400\viewkind0
+\pard\tx720\tx1440\tx2160\tx2880\tx3600\tx4320\tx5040\tx5760\tx6480\tx7200\tx7920\tx8640\pardirnatural\partightenfactor0
+
+\f0\fs24 \cf0 def smart_ingest_workflow(directory: Path, destination_base: Path, model_name: str, dry_run: bool):\
+    """\
+    The 'one command to rule them all' workflow.\
+    Combines stats \uc0\u8594  burst \u8594  cull \u8594  ingest.\
+    """\
+    \
+    print("\\n\uc0\u55356 \u57256  SMART INGEST MODE")\
+    print("   This will: analyze \uc0\u8594  group bursts \u8594  cull \u8594  rename \u8594  organize")\
+    \
+    # Step 1: Stats preview\
+    show_exif_insights(directory, dry_run=True)\
+    \
+    confirm = input("\\n\uc0\u9654 \u65039   Continue with ingestion? (y/n): ")\
+    if confirm.lower() != 'y':\
+        return\
+    \
+    # Step 2: Group bursts (on original filenames)\
+    print("\\n\uc0\u55357 \u56568  Step 1/4: Grouping bursts...")\
+    group_bursts_in_directory(directory, dry_run=False)\
+    \
+    # Step 3: Cull technical duds\
+    print("\\n\uc0\u55357 \u56620  Step 2/4: Culling technical duds...")\
+    cull_images_in_directory(directory, dry_run=False)\
+    \
+    # Step 4: Ingest ONLY the keepers\
+    keepers_dir = directory / "_Keepers"\
+    if keepers_dir.exists():\
+        print("\\n\uc0\u55358 \u56598  Step 3/4: Running AI ingestion on keepers...")\
+        # Temporarily change cwd to keepers folder\
+        original_cwd = Path.cwd()\
+        os.chdir(keepers_dir)\
+        process_directory(keepers_dir, destination_base, model_name, dry_run=False)\
+        os.chdir(original_cwd)\
+    \
+    print("\\n\uc0\u10024  Smart ingest complete!")}

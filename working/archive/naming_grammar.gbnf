@@ -1,0 +1,15 @@
+# GBNF Grammar for PhotoSort AI Naming
+# This grammar enforces strict JSON structure for image descriptions
+
+root ::= ws object ws
+
+# JSON object with single "description" field
+object ::= "{" ws "\"description\"" ws ":" ws string ws "}"
+
+# String - simplified to avoid parsing issues
+# Allows letters, numbers, spaces, and basic punctuation
+string ::= "\"" char+ "\""
+char ::= [a-zA-Z] | [0-9] | " " | "," | "." | "-" | "'"
+
+# Whitespace (optional)
+ws ::= [ \t\n\r]*
