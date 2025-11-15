@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
+from __future__ import annotations
 """
-PhotoSort v9.2 - AI-Powered Photography Workflow Automation (BURST NAMING OPTIMIZED)
+PhotoSort v9.3 - AI-Powered Photography Workflow Automation (LOGGING & UX UPDATE)
 
 Created by: Nick (∞vision crew)
 Engineered by: Claude (Anthropic) + Gemini (Google)
@@ -12,6 +13,11 @@ Features:
 - Quality Culling: v8.0 BRISQUE+VLM cascade (bokeh-aware)
 - EXIF Insights: Session analytics dashboard
 - Smart Prep: Copy keepers to Lightroom folder
+
+v9.3 ENHANCEMENTS:
+- AI Rename Logging: Track all AI renames with timestamps and destinations
+- Clear Progress Messaging: Show breakdown of already-named vs needs-processing
+- Tier A/B/C Culling: Positive selection psychology (no more "duds")
 
 v9.2 OPTIMIZATIONS:
 - Single AI Call per Burst: PICK files get AI-named during stacking
@@ -28,6 +34,7 @@ Tech Stack:
 - Config file: ~/.photosort.conf
 
 Version History:
+V9.3 - AI rename logging, progress messaging clarity, Tier A/B/C culling
 V9.2 - Burst naming optimization (single AI call per burst)
 V9.1 - AI burst naming, organized parent directory for bursts
 V9.0 - qwen2.5vl:3b integration, structured JSON (filename/tags) AI naming
@@ -67,8 +74,6 @@ try:
     from utils import (sanitize_filename as util_sanitize, get_file_size_mb, format_size, 
                        format_duration, get_exif_date, get_exif_camera_info, generate_session_id)
     from session_tracker import SessionTracker
-    # v7.1 GM 3.0: We now in-line SmartProgressBar, so this import is removed
-    # from smart_progress import SmartProgressBar, ModelLoadingProgress 
     from directory_selector import get_source_and_destination, update_config_paths, INQUIRER_AVAILABLE
     V71_MODULES_OK = True
 except ImportError as e:
@@ -169,7 +174,6 @@ except ImportError:
 # ==============================================================================
 
 # v7.1 GM 3.0: In-lined SmartProgressBar with threading
-# This replaces the external smart_progress.py module
 class SmartProgressBar(tqdm):
     """
     tqdm wrapper with an independent, threaded phrase rotator.
@@ -203,7 +207,6 @@ class SmartProgressBar(tqdm):
 
     def update(self, n=1):
         """Override update to also refresh the description."""
-        # Set description *before* update to avoid flicker
         self.set_description(self.current_phrase)
         super().update(n)
 
@@ -278,14 +281,10 @@ def get_terminal_width(default=80):
 def print_visioncrew_animated():
     """
     Animated VISIONCREW banner with 90's warez aesthetics.
-    - Scanline wipedown effect on ASCII art (like old CRT monitors)
-    - Simple text fade-in (no complex flickering to avoid duplication)
-    - Plays once at startup
     """
     
     width = get_terminal_width()
     
-    # The ASCII art - each line as a string
     vision_crew_art = [
         "██    ██ ██ ███████ ██  ██████  ███    ██   ██████ ██████  ███████ ██    ██ ",
         "██    ██ ██ ██      ██ ██    ██ ████   ██  ██      ██   ██ ██      ██    ██ ",
@@ -294,14 +293,12 @@ def print_visioncrew_animated():
         "  ████   ██ ███████ ██  ██████  ██   ████   ██████ ██   ██ ███████ ██ ██ ██ "
     ]
     
-    # Split point to separate "VISION" from "CREW" for coloring
     split_point = 40
     
-    # Text lines (no box, just text)
     text_lines = [
-        "PHOTOSORT v9.2 - BURST NAMING OPTIMIZED",
+        "PHOTOSORT v9.3 - LOGGING & UX UPDATE",
         "cracked by vision crew | serial: 1989-IMG",
-        "",  # Empty line for spacing
+        "",
         "use responsibly.",
         "unleash creatively.",
         "inference locally."
@@ -310,43 +307,27 @@ def print_visioncrew_animated():
     clear_console()
     
     if COLORAMA_AVAILABLE:
-        # =================================================================
-        # SCANLINE WIPEDOWN EFFECT
-        # =================================================================
-        # Simulate old CRT monitor scanlines drawing the ASCII art
-        
         for line in vision_crew_art:
             vision_part = line[:split_point]
             crew_part = line[split_point:]
             
-            # Combine with colors: VISION=white, CREW=red
             colored_line = f"{Fore.WHITE}{Style.BRIGHT}{vision_part}{Fore.RED}{Style.BRIGHT}{crew_part}{Style.RESET_ALL}"
             print(colored_line.center(width))
-            time.sleep(0.08)  # Scanline speed
+            time.sleep(0.08)
         
-        print()  # Space after ASCII art
-        
-        # =================================================================
-        # TEXT FADE-IN (SIMPLE VERSION - NO FLICKER)
-        # =================================================================
-        # Just type out the text line by line
+        print()
         
         left_pad = (width - 40) // 2
         for i, line in enumerate(text_lines):
             if line == "":
                 print()
             elif i < 2:
-                # First two lines: centered, bright red, instant
                 print(f"{Fore.RED}{Style.BRIGHT}{line}{Style.RESET_ALL}".center(width))
             else:
-                # Last three lines: left-aligned, typing effect
                 print(f"{' ' * left_pad}{Fore.RED}{Style.BRIGHT}{line}{Style.RESET_ALL}")
-                time.sleep(0.15)  # Pause between typed lines
+                time.sleep(0.15)
         
     else:
-        # =================================================================
-        # FALLBACK: NO COLORAMA - STATIC DISPLAY
-        # =================================================================
         for line in vision_crew_art:
             print(line.center(width))
         
@@ -361,12 +342,11 @@ def print_visioncrew_animated():
             else:
                 print(f"{' ' * left_pad}{line}")
     
-    print()  # Final padding
+    print()
 
 def print_static_banner():
     """
     Static VISIONCREW banner (no animation)
-    Used when colorama is unavailable or for quick commands
     """
     width = get_terminal_width()
     
@@ -381,7 +361,7 @@ def print_static_banner():
     split_point = 40
     
     text_lines = [
-        "PHOTOSORT v9.0 - AI Ingestion Engine",
+        "PHOTOSORT v9.3 - LOGGING & UX UPDATE",
         "cracked by vision crew | serial: 1989-IMG",
         "",
         "use responsibly.",
@@ -392,7 +372,6 @@ def print_static_banner():
     clear_console()
     
     if COLORAMA_AVAILABLE:
-        # Static colored version (no box)
         for line in vision_crew_art:
             vision_part = line[:split_point]
             crew_part = line[split_point:]
@@ -401,7 +380,6 @@ def print_static_banner():
         
         print()
         
-        # Print text without box
         left_pad = (width - 40) // 2
         for i, line in enumerate(text_lines):
             if line == "":
@@ -411,7 +389,6 @@ def print_static_banner():
             else:
                 print(f"{' ' * left_pad}{Fore.RED}{Style.BRIGHT}{line}{Style.RESET_ALL}")
     else:
-        # Plain text fallback (no box)
         for line in vision_crew_art:
             print(line.center(width))
         
@@ -431,15 +408,12 @@ def print_static_banner():
 def show_banner(mode="animated"):
     """
     Smart banner display based on command type.
-    - mode="animated": Full warez animation (DEFAULT - for all commands!)
-    - mode="quick": Static banner (legacy option, rarely used)
     """
     if mode == "animated" and COLORAMA_AVAILABLE:
         try:
             print_visioncrew_animated()
         except Exception as e:
-            # If animation fails, fall back to static
-            print(f"--- PHOTOSORT v9.0 --- (Animation failed: {e})")
+            print(f"--- PHOTOSORT v9.3 --- (Animation failed: {e})")
             print_static_banner()
     else:
         print_static_banner()
@@ -482,7 +456,7 @@ After your analysis, you MUST return **ONLY a single, valid JSON object**. Do no
 
 # --- Core Configuration ---
 OLLAMA_URL = "http://localhost:11434/api/chat"
-DEFAULT_MODEL_NAME = "qwen2.5vl:3b"  # <-- V9.0 INTEGRATION
+DEFAULT_MODEL_NAME = "qwen2.5vl:3b"
 
 # ==============================================================================
 # v8.0 ALGORITHM CONFIGURATION  
@@ -497,7 +471,7 @@ DEFAULT_BRISQUE_AMBIGUOUS = 50.0
 DEFAULT_VLM_MODEL = "openbmb/minicpm-v2.6:q4_K_M"
 
 DEFAULT_DESTINATION_BASE = Path.home() / "Library/Mobile Documents/com~apple~CloudDocs/negatives"
-DEFAULT_CRITIQUE_MODEL = "qwen2.5vl:3b"  # <-- V9.0 INTEGRATION
+DEFAULT_CRITIQUE_MODEL = "qwen2.5vl:3b"
 
 DEFAULT_CULL_THRESHOLDS = {
     'sharpness_good': 40.0,
@@ -509,11 +483,11 @@ DEFAULT_BURST_THRESHOLD = 8
 CONFIG_FILE_PATH = Path.home() / ".photosort.conf"
 
 SUPPORTED_EXTENSIONS = {'.jpg', '.jpeg', '.png'}
-RAW_SUPPORT = False  # Will be set to True by check_dcraw()
+RAW_SUPPORT = False
 
 MAX_WORKERS = 5
-INGEST_TIMEOUT = 120   # seconds per image
-CRITIQUE_TIMEOUT = 120  # seconds per image (V7.0)
+INGEST_TIMEOUT = 120
+CRITIQUE_TIMEOUT = 120
 
 SESSION_DATE = datetime.now().strftime("%Y-%m-%d")
 SESSION_TIMESTAMP = datetime.now().strftime("%Y-%m-%d_%H%M")
@@ -532,6 +506,11 @@ GROUP_KEYWORDS = {
 
 BEST_PICK_PREFIX = "_PICK_"
 PREP_FOLDER_NAME = "_ReadyForLightroom"
+
+# v9.3: Tier-based cull folder names (positive selection psychology)
+TIER_A_FOLDER = "_Tier_A"  # Best quality (was _Keepers)
+TIER_B_FOLDER = "_Tier_B"  # Review needed (was _Review_Maybe)
+TIER_C_FOLDER = "_Tier_C"  # Archive/low priority (was _Review_Duds)
 
 
 # ==============================================================================
@@ -553,11 +532,10 @@ def check_dcraw():
 def get_available_models() -> Optional[List[str]]:
     """
     Get list of available Ollama models.
-    Returns None if Ollama is unavailable (fail-fast check).
     """
     try:
         result = subprocess.run(['ollama', 'list'], capture_output=True, text=True, check=True)
-        lines = result.stdout.strip().split('\n')[1:]  # Skip header
+        lines = result.stdout.strip().split('\n')[1:]
         models = [line.split()[0] for line in lines if line.strip()]
         return models
     except subprocess.CalledProcessError:
@@ -570,7 +548,6 @@ def get_available_models() -> Optional[List[str]]:
 def parse_model_override() -> Optional[str]:
     """
     V7.0 GOLD: Extract --model argument from CLI if present
-    Returns model name or None
     """
     try:
         if "--model" in sys.argv:
@@ -590,19 +567,16 @@ def convert_raw_to_jpeg(raw_path: Path) -> Optional[bytes]:
         with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp:
             tmp_jpg = tmp.name
         
-        # Use dcraw to convert RAW to PPM (in memory)
         result = subprocess.run(
             ['dcraw', '-c', '-w', '-q', '3', str(raw_path)],
             capture_output=True,
             check=True
         )
         
-        # Write PPM to a temp file
         with tempfile.NamedTemporaryFile(suffix='.ppm', delete=False) as ppm_tmp:
             ppm_tmp.write(result.stdout)
             ppm_file = ppm_tmp.name
         
-        # Use sips to convert PPM to JPEG (macOS specific)
         subprocess.run(
             ['sips', '-s', 'format', 'jpeg', ppm_file, '--out', tmp_jpg],
             capture_output=True,
@@ -612,7 +586,6 @@ def convert_raw_to_jpeg(raw_path: Path) -> Optional[bytes]:
         with open(tmp_jpg, 'rb') as f:
             jpeg_bytes = f.read()
         
-        # Clean up temp files
         os.unlink(ppm_file)
         os.unlink(tmp_jpg)
         
@@ -733,6 +706,43 @@ def categorize_description(description: str) -> str:
         return max(category_scores, key=category_scores.get)
     return "Miscellaneous"
 
+# ==============================================================================
+# v9.3: AI RENAME LOGGING
+# ==============================================================================
+
+def write_rename_log(log_path: Path, original_name: str, new_name: str, destination: Path):
+    """
+    (V9.3) Append an AI rename operation to the log file.
+    
+    Format: timestamp | original_name -> new_name | destination_path
+    
+    This creates a helpful reference for users who back up their entire card
+    and need to track what was renamed and where it went.
+    """
+    try:
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        log_entry = f"{timestamp} | {original_name} -> {new_name} | {destination}\n"
+        
+        with open(log_path, 'a') as f:
+            f.write(log_entry)
+    except Exception as e:
+        # Silent fail - don't interrupt workflow for logging issues
+        pass
+
+def initialize_rename_log(log_path: Path):
+    """
+    (V9.3) Initialize the rename log file with a header.
+    """
+    try:
+        header = f"# PhotoSort AI Rename Log - {SESSION_TIMESTAMP}\n"
+        header += f"# Format: timestamp | original_name -> new_name | destination\n"
+        header += "=" * 80 + "\n"
+        
+        with open(log_path, 'w') as f:
+            f.write(header)
+    except Exception:
+        pass
+
 
 # ==============================================================================
 # VI. CONFIGURATION LOGIC
@@ -741,8 +751,6 @@ def categorize_description(description: str) -> str:
 def load_app_config() -> Dict[str, Any]:
     """
     V7.0: Loads settings from ~/.photosort.conf
-    Uses hardcoded defaults as fallbacks.
-    GOLD: Crash-proof with .get() fallbacks for all values.
     """
     parser = configparser.ConfigParser()
     if CONFIG_FILE_PATH.exists():
@@ -769,7 +777,6 @@ def load_app_config() -> Dict[str, Any]:
         'exposure_good_pct': parser.getfloat('cull', 'exposure_good_pct', fallback=DEFAULT_CULL_THRESHOLDS['exposure_good_pct']),
     }
 
-    # v9.0 FIX: Read the cull_algorithm key from the [cull] section
     config['cull_algorithm'] = parser.get(
         'cull', 'cull_algorithm',
         fallback=DEFAULT_CULL_ALGORITHM
@@ -781,7 +788,6 @@ def load_app_config() -> Dict[str, Any]:
         fallback=DEFAULT_BURST_THRESHOLD
     )
 
-    # v9.0 FIX: Read the burst_algorithm key from the [burst] section
     config['burst_algorithm'] = parser.get(
         'burst', 'burst_algorithm',
         fallback=DEFAULT_BURST_ALGORITHM
@@ -830,14 +836,11 @@ def load_app_config() -> Dict[str, Any]:
 def get_ai_description(image_path: Path, model_name: str) -> Tuple[Optional[str], Optional[List[str]]]:
     """
     (V9.0) Get structured filename and tags from AI.
-    Uses the Qwen model's native JSON capabilities.
-    Returns a tuple: (filename_str, tags_list) or (None, None)
     """
     base64_image = encode_image(image_path)
     if not base64_image:
         return None, None
 
-    # The prompt we validated in our test script
     AI_NAMING_PROMPT = """You are an expert file-naming AI.
 Analyze this image and generate a concise, descriptive filename and three relevant tags.
 You MUST return ONLY a single, valid JSON object, formatted *exactly* like this:
@@ -857,7 +860,7 @@ You MUST return ONLY a single, valid JSON object, formatted *exactly* like this:
             }
         ],
         "stream": False,
-        "format": "json"  # Force JSON output
+        "format": "json"
     }
     
     try:
@@ -867,7 +870,6 @@ You MUST return ONLY a single, valid JSON object, formatted *exactly* like this:
         result = response.json()
         json_string = result['message']['content'].strip()
         
-        # Parse the JSON response
         data = json.loads(json_string)
         
         filename = data.get("filename")
@@ -877,7 +879,6 @@ You MUST return ONLY a single, valid JSON object, formatted *exactly* like this:
             print(f"  Warning: Model returned valid JSON but missing keys for {image_path.name}")
             return None, None
 
-        # Success: return the filename string and the list of tags
         return str(filename), list(tags)
         
     except requests.exceptions.Timeout:
@@ -906,7 +907,7 @@ def get_ai_critique(image_path: Path, model_name: str) -> Optional[str]:
             }
         ],
         "stream": False,
-        "format": "json"  # Force JSON output if model supports it
+        "format": "json"
     }
     
     try:
@@ -928,28 +929,14 @@ def get_ai_critique(image_path: Path, model_name: str) -> Optional[str]:
 def get_ai_image_name(image_path: Path, model_name: str) -> Optional[Dict[str, Any]]:
     """
     (V9.2) Generate AI-powered name for an image (for burst PICK files).
-    
-    Returns a dict with:
-    {
-        'filename': 'autumn-street-crossing',
-        'tags': ['street', 'autumn', 'urban']
-    }
-    or None on failure.
-    
-    This replaces the old get_ai_burst_folder_name() function.
     """
     try:
-        # Reuse the existing get_ai_description function
         filename, tags = get_ai_description(image_path, model_name)
         
         if not filename or not tags:
             return None
         
-        # Strip any file extension the AI might have added (e.g., ".jpg", ".png")
-        # AI sometimes returns "dark-skies-towerjpg" or "sunset.jpg"
         filename_no_ext = Path(filename).stem
-        
-        # Clean the filename
         clean_name = clean_filename(filename_no_ext)
         
         return {
@@ -958,48 +945,36 @@ def get_ai_image_name(image_path: Path, model_name: str) -> Optional[Dict[str, A
         }
         
     except Exception:
-        return None  # Silent fail - use fallback naming
+        return None
 
 def is_already_ai_named(filename: str) -> bool:
     """
     (V9.2) Check if a PICK file already has an AI-generated name.
-    
-    Pattern we're looking for: descriptive-name_PICK.RW2
-    NOT the old pattern: _PICK_IMG_1234.RW2
-    
-    Returns True if the file appears to be AI-named already.
     """
-    # Must end with _PICK.<ext>
     if not re.search(r'_PICK\.\w+$', filename, re.IGNORECASE):
         return False
     
-    # Must NOT start with _PICK_ (old style)
     if filename.startswith('_PICK_'):
         return False
     
-    # If we got here, it's the new style: something_PICK.ext
     return True
 
 def get_image_hash(image_path: Path) -> Optional[tuple[Path, imagehash.ImageHash]]:
     """
     Calculates perceptual hash (visual fingerprint) of an image.
-    V6.5: Simplified RAW thumbnail extraction.
     """
     if image_path.suffix.lower() in ['.rw2', '.cr2', '.nef', '.arw', '.dng']:
         try:
-            # Extract embedded JPEG thumbnail directly
             result = subprocess.run(
                 ['dcraw', '-e', '-c', str(image_path)],
                 capture_output=True,
                 check=True
             )
-            # PIL can read JPEG from memory
             img = Image.open(BytesIO(result.stdout))
             return image_path, imagehash.phash(img)
         except Exception:
             return image_path, None
            
-    # For regular JPG/PNG files
     try:
         with Image.open(image_path) as img:
             return image_path, imagehash.phash(img)
@@ -1010,7 +985,6 @@ def get_image_hash(image_path: Path) -> Optional[tuple[Path, imagehash.ImageHash
 def analyze_image_quality(image_bytes: bytes) -> Dict[str, float]:
     """
     Analyzes image bytes for sharpness and exposure.
-    Core engine reused by cull, burst, and prep features.
     """
     scores = {
         'sharpness': 0.0,
@@ -1024,12 +998,10 @@ def analyze_image_quality(image_bytes: bytes) -> Dict[str, float]:
         if img is None:
             return scores
 
-        # Sharpness (Laplacian variance)
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         laplacian_var = cv2.Laplacian(gray, cv2.CV_64F).var()
         scores['sharpness'] = float(laplacian_var)
 
-        # Exposure (histogram for clipped pixels)
         total_pixels = gray.size
         crushed_blacks = np.sum(gray < 10)
         scores['blacks_pct'] = float(crushed_blacks / total_pixels)
@@ -1044,7 +1016,6 @@ def analyze_image_quality(image_bytes: bytes) -> Dict[str, float]:
 def analyze_single_exif(image_path: Path) -> Optional[Dict]:
     """
     Thread-pool worker: Opens image and extracts key EXIF data.
-    V6.4.2: Intelligently calculates aperture ratios.
     """
     try:
         with open(image_path, 'rb') as f:
@@ -1101,9 +1072,6 @@ def analyze_single_exif(image_path: Path) -> Optional[Dict]:
 def get_ingest_config(APP_CONFIG: dict) -> Tuple[Path, str]:
     """
     (DEPRECATED by v7.1)
-    V6.5: Helper function to get destination and model from user.
-    V7.0: Reads defaults from APP_CONFIG.
-    Returns (destination_path, model_name).
     """
     default_dest = APP_CONFIG['default_destination']
     default_model = APP_CONFIG['default_model']
@@ -1128,7 +1096,6 @@ def get_ingest_config(APP_CONFIG: dict) -> Tuple[Path, str]:
     
     print(f"\n 🤖 Default model: {default_model}")
     
-    # v7.1 GM 3.0: Add model loading spinner
     loader = ModelLoadingProgress(message="Checking Ollama connection...")
     loader.start()
     available_models = get_available_models()
@@ -1163,35 +1130,34 @@ def get_ingest_config(APP_CONFIG: dict) -> Tuple[Path, str]:
     
     return chosen_destination, chosen_model
 
-def process_single_image(image_path: Path, destination_base: Path, model_name: str, dry_run: bool) -> Tuple[Path, bool, str, str]:
+def process_single_image(image_path: Path, destination_base: Path, model_name: str, dry_run: bool, rename_log_path: Optional[Path] = None) -> Tuple[Path, bool, str, str]:
     """
-    (V9.2) Process one image: get AI name/tags, rename, move to temp location.
+    (V9.3) Process one image: get AI name/tags, rename, move to temp location.
     
-    V9.2 OPTIMIZATION: Skip AI naming if file already has AI-generated name
-    (i.e., it's a PICK that was already named during burst stacking).
+    V9.3 ENHANCEMENT: Now accepts optional rename_log_path to track all renames.
+    V9.2 OPTIMIZATION: Skip AI naming if file already has AI-generated name.
     
     Returns: (original_path, success_bool, new_filename_str, description_for_categorization)
     """
     try:
         # V9.2: Check if this is already an AI-named PICK file
         if is_already_ai_named(image_path.name):
-            # Already named! Just move it without re-analyzing
             extension = image_path.suffix.lower()
-            base_name = image_path.stem  # e.g., "autumn-street-crossing_PICK"
+            base_name = image_path.stem
             
-            # Remove the _PICK suffix to get the clean base name
             if base_name.endswith('_PICK'):
-                clean_base = base_name[:-5]  # Remove "_PICK"
+                clean_base = base_name[:-5]
             else:
                 clean_base = base_name
             
-            # Create new path with original extension
             new_path = get_unique_filename(clean_base, extension, destination_base)
             
             if not dry_run:
                 shutil.move(str(image_path), str(new_path))
+                # v9.3: Log the rename
+                if rename_log_path:
+                    write_rename_log(rename_log_path, image_path.name, new_path.name, destination_base)
             
-            # For categorization, we don't have the tags, so use the filename as description
             description_for_categorization = clean_base.replace('-', ' ')
             
             return image_path, True, new_path.name, description_for_categorization
@@ -1202,22 +1168,18 @@ def process_single_image(image_path: Path, destination_base: Path, model_name: s
         if not ai_filename or not ai_tags:
             return image_path, False, "Failed to get valid AI JSON response", ""
         
-        # Create the description string for categorization
         description_for_categorization = " ".join(ai_tags)
 
-        # Clean the AI-provided filename
         clean_name = Path(ai_filename).stem
-        
-        # Get the original extension
         extension = image_path.suffix.lower()
-        
-        # Create the new, unique path
         new_path = get_unique_filename(clean_name, extension, destination_base)
         
         if not dry_run:
             shutil.move(str(image_path), str(new_path))
+            # v9.3: Log the rename
+            if rename_log_path:
+                write_rename_log(rename_log_path, image_path.name, new_path.name, destination_base)
         
-        # Return the new name and the tag-based description
         return image_path, True, new_path.name, description_for_categorization
         
     except Exception as e:
@@ -1226,8 +1188,6 @@ def process_single_image(image_path: Path, destination_base: Path, model_name: s
 def organize_into_folders(processed_files: List[Dict], files_source: Path, destination_base: Path, dry_run: bool):
     """
     Group files into folders based on their descriptions.
-    v7.1 (Patched): Accepts `files_source` to know where files *are*,
-    and `destination_base` to know where they *should go*.
     """
     print(f"\n{'='*60}")
     print(" 🗂️  Organizing into smart folders...")
@@ -1243,11 +1203,8 @@ def organize_into_folders(processed_files: List[Dict], files_source: Path, desti
             'description': description
         })
     
-    # v7.1: We are now organizing into a dated_session folder,
-    # so the folder_name is just the category.
     for category, files in categories.items():
-        # folder_name = f"{SESSION_DATE}_{category}" # v7.0 logic
-        folder_name = category # v7.1 logic
+        folder_name = category
         folder_path = destination_base / folder_name
         
         if not dry_run:
@@ -1256,7 +1213,6 @@ def organize_into_folders(processed_files: List[Dict], files_source: Path, desti
         print(f" {folder_name}/ ({len(files)} files)")
         
         for file_info in files:
-            # v7.1 (Patched): Use `files_source` for source path
             src = files_source / file_info['filename']
             dst = folder_path / file_info['filename']
             
@@ -1264,8 +1220,6 @@ def organize_into_folders(processed_files: List[Dict], files_source: Path, desti
                 if src.exists():
                     shutil.move(str(src), str(dst))
                 else:
-                    # This case can happen if files were processed to a temp dir
-                    # that's different from the final root.
                     print(f"   [WARN] Source file not found: {src}")
             else:
                 print(f"   [PREVIEW] Would move {file_info['filename']} here")
@@ -1275,18 +1229,10 @@ def organize_into_folders(processed_files: List[Dict], files_source: Path, desti
 def generate_ai_session_name(categories: Dict[str, int], model_name: str) -> Optional[str]:
     """
     v7.1: Generate AI-powered session name based on image categories.
-    
-    Args:
-        categories: Dict of category names to image counts
-        model_name: AI model to use for naming
-    
-    Returns:
-        AI-generated session name or None if failed
     """
     if not categories:
         return None
     
-    # Build category breakdown for prompt
     category_list = [f"- {cat}: {count} images" for cat, count in categories.items()]
     category_text = "\n".join(category_list)
     
@@ -1298,47 +1244,62 @@ Analyze the photo categories and counts provided, then follow these steps *in or
    - What is the primary subject matter? (e.g., architecture, portraits, nature)
    - What secondary themes are present?
 
-2. **Determine the Creative Mood:**
-   - What style or atmosphere connects these images? (e.g., urban, moody, minimalist, colorful)
+2. **Capture the Artistic Mood:**
+   - What feeling or vibe does this collection evoke? (e.g., contemplative, energetic, nostalgic)
+   - Consider the balance of subjects.
 
-3. **Generate Session Title:**
-   - Create a concise 2-4 word title that captures both theme and mood
-   - Use descriptive, photographic language
-   - Examples: "Urban Geometry Study", "Golden Hour Portraits", "Moody Street Life"
+3. **Generate a Single-Word Session Name:**
+   - Combine your thematic and mood analysis into ONE evocative word.
+   - The word should be abstract and artistic, NOT a literal description.
+   - Think of names like "Convergence", "Threshold", "Ephemera", "Solstice", "Momentum".
 
-Categories in this session:
+Photo Categories:
 {category_text}
 
-Respond with ONLY the final title on a single line, no explanation.
-Session Title:"""
+Respond with ONLY a single JSON object in this exact format:
+{{"session_name": "<your-single-word-name>"}}
+"""
+    
+    payload = {
+        "model": model_name,
+        "messages": [
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        "stream": False,
+        "format": "json"
+    }
     
     try:
-        payload = {
-            "model": model_name,
-            "messages": [{"role": "user", "content": prompt}],
-            "stream": False
-        }
-        
-        response = requests.post(OLLAMA_URL, json=payload, timeout=30)
+        response = requests.post(OLLAMA_URL, json=payload, timeout=60)
         response.raise_for_status()
         
         result = response.json()
-        title = result['message']['content'].strip()
+        json_string = result['message']['content'].strip()
         
-        # Clean up the title
-        title = title.replace('"', '').replace("'", "")
-        title = title.replace("Session Title:", "").strip()
+        data = json.loads(json_string)
+        session_name = data.get("session_name", "")
         
-        # Sanitize for filesystem
-        title = util_sanitize(title, max_length=50)
+        if session_name:
+            clean_name = re.sub(r'[^\w-]', '', session_name)
+            return clean_name[:30]
         
-        return title if title else None
+        return None
         
     except Exception as e:
+        print(f"  Warning: Could not generate AI session name: {e}")
         return None
 
-def process_directory(directory: Path, destination_base: Path, model_name: str, dry_run: bool, max_workers: int = MAX_WORKERS):
-    """(DEFAULT MODE) Process all images with AI, rename, and organize"""
+def process_directory(directory: Path, destination_base: Path, model_name: str, dry_run: bool):
+    """
+    (V4.0+) Main processing loop - AI-describes and organizes images.
+    """
+    print(f"\n{'='*60}")
+    print(f" 📁 Processing: {directory}")
+    print(f" 📂 Destination: {destination_base}")
+    print(f"{'='*60}")
     
     image_files = [
         f for f in directory.iterdir() 
@@ -1346,29 +1307,26 @@ def process_directory(directory: Path, destination_base: Path, model_name: str, 
     ]
     
     if not image_files:
-        print(f"  No supported image files found in {directory}")
-        print(f"   Looking for: {', '.join(SUPPORTED_EXTENSIONS)}")
+        print("   No supported images found in this directory.")
         return
     
-    print(f"\n Found {len(image_files)} images to process")
-    print(f" Destination: {destination_base}")
-    print(f" Model: {model_name}")
-    print(f"  Using {max_workers} concurrent workers")
-    if RAW_SUPPORT:
-        print(" 📸 RAW support enabled (dcraw)")
-    print(f"{'='*60}\n")
+    print(f"\n Found {len(image_files)} images to process.")
+    
+    # v9.3: Initialize rename log
+    rename_log_path = destination_base / f"_ai_rename_log_{SESSION_TIMESTAMP}.txt"
+    if not dry_run:
+        initialize_rename_log(rename_log_path)
     
     results = {"success": [], "failed": []}
     
-    # v7.1 (Patched): Use SmartProgressBar
     pbar = None
     if TQDM_AVAILABLE:
-        pbar = SmartProgressBar(total=len(image_files), desc=" 🤖 Processing images", unit="img")
+        pbar = SmartProgressBar(total=len(image_files), desc=" 🤖 AI Processing", unit="img")
     
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         future_to_file = {
-            executor.submit(process_single_image, img, destination_base, model_name, dry_run): img 
-            for img in image_files
+            executor.submit(process_single_image, img_path, destination_base, model_name, dry_run, rename_log_path): img_path 
+            for img_path in image_files
         }
         
         for future in as_completed(future_to_file):
@@ -1384,11 +1342,9 @@ def process_directory(directory: Path, destination_base: Path, model_name: str, 
                 results["failed"].append((original.name, message))
                 if pbar:
                     pbar.write(f" ❌ {original.name}: {message}")
-                else:
-                    print(f" ❌ {original.name}: {message}")
             
             if pbar:
-                pbar.update() # Use pbar.update() to trigger phrase rotation
+                pbar.update()
     
     if pbar:
         pbar.close()
@@ -1403,7 +1359,6 @@ def process_directory(directory: Path, destination_base: Path, model_name: str, 
             print(f"   • {orig}: {reason}")
     
     if results["success"]:
-        # v7.1: Legacy mode also gets AI session naming
         categories = {}
         for item in results["success"]:
             cat = categorize_description(item["description"])
@@ -1411,7 +1366,6 @@ def process_directory(directory: Path, destination_base: Path, model_name: str, 
         
         session_name = generate_ai_session_name(categories, model_name)
         
-        # v7.1 (Patched): Stronger check for valid AI name
         if session_name and len(session_name) > 2:
             dated_folder = f"{SESSION_DATE}_{session_name}"
             print(f"\n   🎨 AI Session Name: {dated_folder}")
@@ -1421,7 +1375,6 @@ def process_directory(directory: Path, destination_base: Path, model_name: str, 
         final_destination = destination_base / dated_folder
         final_destination.mkdir(parents=True, exist_ok=True)
         
-        # v7.1 (Patched): Pass correct source and destination paths
         organize_into_folders(results["success"], destination_base, final_destination, dry_run=False)
     
     log_file = destination_base / f"_import_log_{SESSION_TIMESTAMP}.json"
@@ -1439,6 +1392,7 @@ def process_directory(directory: Path, destination_base: Path, model_name: str, 
             }, f, indent=2)
         
         print(f"\n Log saved: {log_file.name}")
+        print(f" 📝 Rename log saved: {rename_log_path.name}")
     else:
         print(f"\n[PREVIEW] Would save log file to: {log_file.name}")
 
@@ -1446,13 +1400,9 @@ def process_directory(directory: Path, destination_base: Path, model_name: str, 
 
 def group_bursts_in_directory(directory: Path, dry_run: bool, APP_CONFIG: dict, max_workers: int = MAX_WORKERS):
     """
-    (V9.2 OPTIMIZED) Finds and stacks burst groups, AI-naming the best pick.
+    (V9.3) Finds and stacks burst groups, AI-naming the best pick.
     
-    V9.2 CHANGES:
-    - PICK files are AI-named during stacking (not during culling)
-    - Folder name derives from PICK filename (e.g., autumn-street-crossing_burst/)
-    - Alternates are numbered based on PICK base name
-    - Eliminates duplicate AI calls in the auto workflow
+    V9.3: Now logs all AI renames to a dedicated log file.
     """
     
     print(f"\n{'='*60}")
@@ -1572,9 +1522,8 @@ def group_bursts_in_directory(directory: Path, dry_run: bool, APP_CONFIG: dict, 
         pbar_burst.close()
 
 
-    # === v9.2 ENHANCED: AI naming + parent directory ===
+    # === v9.3 ENHANCED: AI naming + parent directory + logging ===
     
-    # Check if parent folder is enabled
     use_parent_folder = APP_CONFIG.get('burst_parent_folder', True)
     
     if use_parent_folder:
@@ -1587,11 +1536,14 @@ def group_bursts_in_directory(directory: Path, dry_run: bool, APP_CONFIG: dict, 
     
     print(f"\n Stacking {len(all_burst_groups)} burst groups...")
     
-    # Get model for AI naming (use default from config)
+    # v9.3: Initialize rename log for burst operations
+    rename_log_path = directory / f"_ai_rename_log_{SESSION_TIMESTAMP}.txt"
+    if not dry_run:
+        initialize_rename_log(rename_log_path)
+    
     ai_model = APP_CONFIG.get('default_model', DEFAULT_MODEL_NAME)
     
     for i, group in enumerate(all_burst_groups):
-        # === V9.2 NEW: AI name the PICK file FIRST ===
         winner_data = best_picks.get(i)
         sample_image = winner_data[0] if winner_data else group[0]
         
@@ -1599,20 +1551,16 @@ def group_bursts_in_directory(directory: Path, dry_run: bool, APP_CONFIG: dict, 
         ai_result = get_ai_image_name(sample_image, ai_model)
         
         if ai_result and ai_result.get('filename'):
-            # Success! Use AI name for both PICK and folder
-            base_name = ai_result['filename']  # e.g., "autumn-street-crossing"
+            base_name = ai_result['filename']
             folder_name = f"{base_name}_burst"
             print(f"   ✓ AI named: {base_name}")
         else:
-            # Fallback to numbered naming
             base_name = f"burst-{i+1:03d}"
             folder_name = base_name
             print(f"   ⚠️  AI naming failed, using: {base_name}")
         
-        # Create folder path
         folder_path = bursts_parent / folder_name
         
-        # Handle name collisions
         if folder_path.exists():
             counter = 2
             original_name = folder_name
@@ -1626,17 +1574,14 @@ def group_bursts_in_directory(directory: Path, dry_run: bool, APP_CONFIG: dict, 
         if not dry_run:
             folder_path.mkdir(parents=True, exist_ok=True)
         
-        # === V9.2 NEW: Name files based on AI base_name ===
         alternate_counter = 1
         
         for file_path in group:
-            extension = file_path.suffix  # Keep original extension
+            extension = file_path.suffix
             
             if winner_data and file_path == winner_data[0]:
-                # This is the PICK - use AI name
                 new_name = f"{base_name}_PICK{extension}"
             else:
-                # This is an alternate - number it
                 new_name = f"{base_name}_{alternate_counter:03d}{extension}"
                 alternate_counter += 1
             
@@ -1646,6 +1591,8 @@ def group_bursts_in_directory(directory: Path, dry_run: bool, APP_CONFIG: dict, 
                 try:
                     shutil.move(str(file_path), str(new_file_path))
                     print(f"      Moved {file_path.name} → {new_name}")
+                    # v9.3: Log the rename
+                    write_rename_log(rename_log_path, file_path.name, new_name, folder_path)
                 except Exception as e:
                     print(f"      FAILED to move {file_path.name}: {e}")
             else:
@@ -1654,6 +1601,8 @@ def group_bursts_in_directory(directory: Path, dry_run: bool, APP_CONFIG: dict, 
     print("\n Burst stacking complete!")
     if use_parent_folder:
         print(f" All burst groups organized in: {bursts_parent}")
+    if not dry_run:
+        print(f" 📝 Rename log saved: {rename_log_path.name}")
 
 
 # --- Cull Workflow ---
@@ -1668,7 +1617,14 @@ def process_image_for_culling(image_path: Path) -> Tuple[Path, Optional[Dict[str
     return image_path, scores
 
 def cull_images_in_directory(directory: Path, dry_run: bool, APP_CONFIG: dict, max_workers: int = MAX_WORKERS):
-    """(V6.0) Finds and groups images by technical quality"""
+    """
+    (V9.3) Finds and groups images by technical quality using Tier A/B/C naming.
+    
+    V9.3 ENHANCEMENT: Uses positive selection psychology with tier-based naming:
+    - Tier A: Best quality (was "Keepers")
+    - Tier B: Review needed (was "Maybe")
+    - Tier C: Archive/low priority (was "Duds")
+    """
     
     print(f"\n{'='*60}")
     print(f" 🗑️  PhotoSort --- (Cull Mode)")
@@ -1679,7 +1635,7 @@ def cull_images_in_directory(directory: Path, dry_run: bool, APP_CONFIG: dict, m
     
     if algorithm == 'brisque' and V8_AVAILABLE:
         print(f" ✓ Using v8.0 BRISQUE+VLM cascade")
-        print(f"   Keeper: <{APP_CONFIG.get('cull_brisque_keeper', 35.0)}, Ambiguous: >{APP_CONFIG.get('cull_brisque_ambiguous', 50.0)}")
+        print(f"   Tier A: <{APP_CONFIG.get('cull_brisque_keeper', 35.0)}, Tier C: >{APP_CONFIG.get('cull_brisque_ambiguous', 50.0)}")
     elif algorithm == 'brisque' and not V8_AVAILABLE:
         print(f" ⚠️  BRISQUE not available, using legacy Laplacian")
         algorithm = 'legacy'
@@ -1724,7 +1680,8 @@ def cull_images_in_directory(directory: Path, dry_run: bool, APP_CONFIG: dict, m
     print("\n  Triaging images into quality tiers...")
     
     th = APP_CONFIG['cull_thresholds']
-    tiers = {"Good": [], "Maybe": [], "Dud": []}
+    # v9.3: Using tier-based naming internally
+    tiers = {"Tier_A": [], "Tier_B": [], "Tier_C": []}
     log_data = []
 
     for path, scores in all_scores.items():
@@ -1737,11 +1694,11 @@ def cull_images_in_directory(directory: Path, dry_run: bool, APP_CONFIG: dict, m
         is_sharp_bad = sharp < th['sharpness_dud']
         is_sharp_good = sharp > th['sharpness_good']
 
-        tier = "Maybe"
+        tier = "Tier_B"  # Default to middle tier
         if is_sharp_bad or is_exposure_bad:
-            tier = "Dud"
+            tier = "Tier_C"
         elif is_sharp_good and is_exposure_good:
-            tier = "Good"
+            tier = "Tier_A"
         
         tiers[tier].append(path)
         log_data.append({
@@ -1752,12 +1709,14 @@ def cull_images_in_directory(directory: Path, dry_run: bool, APP_CONFIG: dict, m
             'whites_pct': round(whites, 4)
         })
 
-    print(f"\n Found {len(tiers['Good'])} Keepers, {len(tiers['Maybe'])} Maybes, and {len(tiers['Dud'])} Duds.")
+    # v9.3: Updated messaging with tier names
+    print(f"\n Found {len(tiers['Tier_A'])} Tier A, {len(tiers['Tier_B'])} Tier B, and {len(tiers['Tier_C'])} Tier C.")
     
+    # v9.3: Using tier-based folder names
     folder_map = {
-        "Good": directory / "_Keepers",
-        "Maybe": directory / "_Review_Maybe",
-        "Dud": directory / "_Review_Duds"
+        "Tier_A": directory / TIER_A_FOLDER,
+        "Tier_B": directory / TIER_B_FOLDER,
+        "Tier_C": directory / TIER_C_FOLDER
     }
     
     for tier, paths in tiers.items():
@@ -1789,6 +1748,11 @@ def cull_images_in_directory(directory: Path, dry_run: bool, APP_CONFIG: dict, m
                 "session_date": SESSION_TIMESTAMP,
                 "source_directory": str(directory),
                 "thresholds_used": th,
+                "tier_mapping": {
+                    "Tier_A": "Best quality (high sharpness, good exposure)",
+                    "Tier_B": "Review needed (moderate quality)",
+                    "Tier_C": "Archive/low priority (low sharpness or bad exposure)"
+                },
                 "analysis": sorted(log_data, key=lambda x: x['sharpness'])
             }, f, indent=2)
         
@@ -1810,7 +1774,7 @@ def prep_smart_export(directory: Path, dry_run: bool, APP_CONFIG: dict, max_work
     print(f"\n{'='*60}")
     print(f" ✨ PhotoSort --- (Smart Prep Mode)")
     print(f"{'='*60}")
-    print(f" Finding 'Keepers' to copy to: {PREP_FOLDER_NAME}/")
+    print(f" Finding 'Tier A' to copy to: {PREP_FOLDER_NAME}/")
     
     image_files = [
         f for f in directory.iterdir() 
@@ -1846,7 +1810,7 @@ def prep_smart_export(directory: Path, dry_run: bool, APP_CONFIG: dict, max_work
     if pbar:
         pbar.close()
 
-    print("\n  Finding 'Good' tier images...")
+    print("\n  Finding 'Tier A' images...")
     
     th = APP_CONFIG['cull_thresholds']
     good_files = []
@@ -1863,11 +1827,11 @@ def prep_smart_export(directory: Path, dry_run: bool, APP_CONFIG: dict, max_work
             good_files.append(path)
 
     if not good_files:
-        print("\n No 'Keepers' found that meet the 'Good' tier criteria.")
+        print("\n No 'Tier A' found that meet the quality criteria.")
         print("   (Try adjusting CULL_THRESHOLDS in ~/.photosort.conf if this seems wrong)")
         return
 
-    print(f"\n Found {len(good_files)} 'Keepers' to copy.")
+    print(f"\n Found {len(good_files)} 'Tier A' to copy.")
     
     folder_path = directory / PREP_FOLDER_NAME
     
@@ -2017,62 +1981,39 @@ def show_exif_insights(directory: Path, dry_run: bool, APP_CONFIG: dict, max_wor
     print("\n 🎨 Creative Habits (Top 3):")
         
     print("\n    Cameras:")
-    for camera, count in camera_counter.most_common(3):
-        print(f"      • {camera}: {count}")
+    for cam, count in camera_counter.most_common(3):
+        print(f"      {cam}: {count} shots")
 
-    print("\n    Focal Lengths (Composition):")
+    print("\n    Focal Lengths:")
     for focal, count in focal_len_counter.most_common(3):
-        print(f"      • {focal}: {count}")
-        
-    print("\n    Apertures (Depth of Field):")
-    for aperture, count in aperture_counter.most_common(3):
-        print(f"      • {aperture}: {count}")
+        print(f"      {focal}: {count} shots")
+
+    print("\n    Apertures:")
+    for ap, count in aperture_counter.most_common(3):
+        print(f"      {ap}: {count} shots")
 
     print(f"\n{'='*60}")
-    print(f" Summary saved to: {log_file_path.name}")
+    if not dry_run:
+        print(f" Log saved: {log_file_path.name}")
 
-# --- Critique Workflow (V7.0) ---
+
+# --- Critique Workflow ---
 
 def critique_images_in_directory(directory: Path, dry_run: bool, APP_CONFIG: dict, max_workers: int = MAX_WORKERS):
-    """
-    (V7.0) Generates artistic critiques for images.
-    Saves JSON sidecar files next to each image.
-    GOLD: Implemented --dry-run, --model override, and model availability check.
-    """
+    """(V7.0) Runs AI "Creative Director" critique on all images"""
     
-    print("\n" + "="*60)
-    print(" 🎨 PhotoSort --- (AI Critic Mode)")
-    print("="*60)
+    print(f"\n{'='*60}")
+    print(f" 🎨 PhotoSort --- (AI Critique Mode)")
+    print(f"{'='*60}")
+    print(f" Running AI Creative Director on: {directory}")
     
-    # GOLD: Use centralized CLI argument parser
-    cli_model_override = parse_model_override()
-    model_name = cli_model_override or APP_CONFIG['critique_model']
-    
-    print(f" Analyzing images in: {directory}")
-    if cli_model_override:
-        print(f" ⓘ  Overriding config with CLI model: {model_name}")
+    cli_model = parse_model_override()
+    if cli_model:
+        chosen_model = cli_model
+        print(f" ⚠️  Model override via CLI: {chosen_model}")
     else:
-        print(f" Using Creative Director model: {model_name}")
-    
-    # Model availability check
-    loader = ModelLoadingProgress(message="Checking Ollama connection...")
-    loader.start()
-    available_models = get_available_models()
-    loader.stop()
-    
-    if available_models and model_name not in available_models:
-        print(f"\n ⚠️  Warning: Model '{model_name}' not found in 'ollama list'.")
-        print(f"   Available: {', '.join(available_models)}")
-        confirm = input("   Continue anyway? (y/n): ").strip().lower()
-        if confirm != 'y':
-            print("Cancelled.")
-            return
-    elif available_models is None:
-        print("\n ❌ FATAL: Could not connect to Ollama server.")
-        print("   Please ensure Ollama is running.")
-        return
-
-    print(f" Output: .json sidecar files (e.g., photo.json)")
+        chosen_model = APP_CONFIG.get('critique_model', DEFAULT_CRITIQUE_MODEL)
+        print(f" 🤖 Using model: {chosen_model}")
     
     image_files = [
         f for f in directory.iterdir() 
@@ -2080,103 +2021,70 @@ def critique_images_in_directory(directory: Path, dry_run: bool, APP_CONFIG: dic
     ]
     
     if not image_files:
-        print("     No supported images to analyze. Exiting.")
+        print("     No supported images to critique. Exiting.")
         return
 
-    # Find files that *don't* have a .json sidecar yet
-    files_to_critique = []
-    for f in image_files:
-        if not f.with_suffix('.json').exists():
-            files_to_critique.append(f)
+    print(f"\n Found {len(image_files)} images to critique.")
     
-    if not files_to_critique:
-        print(f"\n All {len(image_files)} images already have .json critiques. All done!")
-        return
-
-    print(f"\n Found {len(files_to_critique)} new images to critique (skipping {len(image_files) - len(files_to_critique)} already done).")
+    if not dry_run:
+        confirm = input(f"   Continue? (y/n): ").strip().lower()
+        if confirm != 'y':
+            print("   Cancelled.")
+            return
     
-    # Dry-run support
-    if dry_run:
-        print("\n [PREVIEW] Would analyze the following files:")
-        for f in files_to_critique:
-            print(f"   • {f.name}")
-        print("\n [PREVIEW] Dry run complete. No critiques were generated.")
-        return
-
-    results = {"success": 0, "failed": 0, "invalid_json": 0}
+    results = {"success": 0, "failed": 0}
     
     pbar = None
     if TQDM_AVAILABLE:
-        pbar = SmartProgressBar(total=len(files_to_critique), desc=" 🎨 Critiquing", unit="img")
+        pbar = SmartProgressBar(total=len(image_files), desc=" 🎨 Critiquing", unit="img")
     
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_file = {
-            executor.submit(get_ai_critique, img_path, model_name): img_path 
-            for img_path in files_to_critique
-        }
+    for img_path in image_files:
+        critique_json = get_ai_critique(img_path, chosen_model)
         
-        for future in as_completed(future_to_file):
-            img_path = future_to_file[future]
-            json_string = future.result()
-            json_path = img_path.with_suffix('.json')
-
-            if not json_string:
-                results["failed"] += 1
-                if pbar:
-                    pbar.write(f" ❌ {img_path.name}: Failed (No response from model)")
-                continue
-
-            try:
-                # Clean up potential markdown fences
-                if json_string.startswith("```json"):
-                    json_string = json_string.strip("```json\n")
-                if json_string.endswith("```"):
-                    json_string = json_string.strip("```\n")
-                
-                # Validate JSON
-                data = json.loads(json_string) 
-                
-                with open(json_path, 'w') as f:
-                    json.dump(data, f, indent=2)
-                
+        if critique_json:
+            json_filename = img_path.stem + ".json"
+            json_path = directory / json_filename
+            
+            if not dry_run:
+                try:
+                    with open(json_path, 'w') as f:
+                        f.write(critique_json)
+                    results["success"] += 1
+                except Exception as e:
+                    if pbar:
+                        pbar.write(f" ❌ Failed to save {json_filename}: {e}")
+                    results["failed"] += 1
+            else:
                 results["success"] += 1
-
-            except json.JSONDecodeError:
-                results["invalid_json"] += 1
-                if pbar:
-                    pbar.write(f" ❌ {img_path.name}: Failed (Model returned invalid JSON)")
-                # Save the bad response for debugging
-                with open(img_path.with_suffix('.bad.json'), 'w') as f:
-                    f.write(json_string)
-            except Exception as e:
-                results["failed"] += 1
-                if pbar:
-                    pbar.write(f" ❌ {img_path.name}: Failed ({e})")
-
-            if pbar:
-                pbar.update()
-
+        else:
+            results["failed"] += 1
+        
+        if pbar:
+            pbar.update()
+    
     if pbar:
         pbar.close()
-
+    
     print(f"\n{'='*60}")
-    print(" 🎨 Critique Complete")
-    print(f"   Successfully generated: {results['success']}")
-    print(f"   Invalid JSON returned:  {results['invalid_json']}")
-    print(f"   Failed (no response):   {results['failed']}")
-    print("="*60)
-    print(f" JSON sidecar files are saved in: {directory}")
+    print(f" ✅ Successfully critiqued: {results['success']}")
+    print(f" ❌ Failed: {results['failed']}")
+    
+    if not dry_run:
+        print(f"\n JSON sidecar files saved alongside images.")
+    else:
+        print(f"\n [PREVIEW] Would save JSON sidecar files alongside images.")
 
-# --- Auto-Workflow (The "One-Button" Tool) ---
+
+# --- Auto Workflow ---
 
 def auto_workflow(directory: Path, chosen_destination: Path, dry_run: bool, APP_CONFIG: dict, max_workers: int = MAX_WORKERS):
     """
-    (V9.2 OPTIMIZED) Fully automated workflow: Stack → Cull → AI-Name → Archive.
+    (V9.3) Complete automated workflow: Stack → Cull → AI-Name → Archive.
     
-    V9.2 CHANGES:
-    - PICK files are AI-named during burst stacking
-    - process_single_image() skips AI naming for pre-named PICKs
-    - 79% reduction in AI calls for burst-heavy sessions
+    V9.3 ENHANCEMENTS:
+    - Clear progress messaging showing already-named vs needs-processing breakdown
+    - AI rename logging for all operations
+    - Uses Tier A/B/C cull folder naming
     """
     
     print("\n" + "="*60)
@@ -2185,8 +2093,7 @@ def auto_workflow(directory: Path, chosen_destination: Path, dry_run: bool, APP_
     print("This will automatically Stack, Cull, AI-Name, and Archive")
     print("all 'hero' photos from this session.")
     
-    # v7.1 (Patched): New UX loop for confirmation
-    chosen_model = APP_CONFIG['default_model'] # Start with default
+    chosen_model = APP_CONFIG['default_model']
     
     while True:
         print("\n" + "-"*60)
@@ -2197,7 +2104,6 @@ def auto_workflow(directory: Path, chosen_destination: Path, dry_run: bool, APP_
         print("\n Step 1/5: Configuration")
         print(f" 🤖 Current model: {chosen_model}")
         
-        # v7.1 GM 3.0: Add model loading spinner
         loader = ModelLoadingProgress(message="Checking Ollama connection...")
         loader.start()
         available_models = get_available_models()
@@ -2206,7 +2112,7 @@ def auto_workflow(directory: Path, chosen_destination: Path, dry_run: bool, APP_
         if available_models is None:
             print("\n ❌ FATAL: Could not connect to Ollama server.")
             print("   Please ensure Ollama is running.")
-            return # Use return, not sys.exit
+            return
 
         if available_models:
             print(f"    Available models: {', '.join(available_models)}")
@@ -2226,14 +2132,10 @@ def auto_workflow(directory: Path, chosen_destination: Path, dry_run: bool, APP_
             print(get_quit_message())
             return
         elif confirm.lower() == 'y':
-            break # Confirmed, break loop and proceed
-        # 'n' will just loop again, re-prompting for the model
+            break
     
-    # Initialize session tracker (moved after loop)
     tracker = SessionTracker()
     tracker.set_model(chosen_model)
-    # v8.0 GM PATCH: Commenting out problematic tracker calls until SessionTracker is fixed
-    # tracker.set_source(directory)  # Method doesn't exist in SessionTracker
     tracker.add_operation("Burst Stacking")
     tracker.add_operation("Quality Culling")
     tracker.add_operation("AI Naming")
@@ -2249,53 +2151,55 @@ def auto_workflow(directory: Path, chosen_destination: Path, dry_run: bool, APP_
     print("\n Step 3/5: Stacking burst shots (with AI naming)...")
     group_bursts_in_directory(directory, dry_run=dry_run, APP_CONFIG=APP_CONFIG, max_workers=max_workers)
 
-    # Step 4: Cull Singles
+    # Step 4: Cull Singles (V9.3: Now uses Tier A/B/C naming)
     print("\n Step 4/5: Culling single shots...")
     cull_images_in_directory(directory, dry_run=dry_run, APP_CONFIG=APP_CONFIG, max_workers=max_workers)
 
-    # V6.5 VALIDATION: Check if we have any keepers
-    keepers_dir = directory / "_Keepers"
-    if not keepers_dir.is_dir() or not any(keepers_dir.iterdir()):
-        print("\n  Warning: No '_Keepers' folder found or it's empty.")
-        print("   Cull may have failed or all images were duds.")
+    # V9.3: Check for Tier A folder (was _Keepers)
+    tier_a_dir = directory / TIER_A_FOLDER
+    if not tier_a_dir.is_dir() or not any(tier_a_dir.iterdir()):
+        print(f"\n  Warning: No '{TIER_A_FOLDER}' folder found or it's empty.")
+        print("   Cull may have failed or all images were lower tiers.")
 
-    # Step 5: Find and AI-name hero files (V9.2: Skips pre-named PICKs!)
+    # Step 5: Find and AI-name hero files (V9.3: Enhanced messaging!)
     print("\n Step 5/5: Finding and archiving 'hero' files...")
     
     hero_files = []
     
-    # Get keepers
-    if keepers_dir.is_dir():
-        for f in keepers_dir.iterdir():
+    # Get Tier A files (was keepers)
+    if tier_a_dir.is_dir():
+        for f in tier_a_dir.iterdir():
             if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS:
                 hero_files.append(f)
     
     # Get picks from bursts
-    # v9.1 ENHANCED: Look for burst folders (check parent directory first, then root)
     burst_parent = directory / "_Bursts"
     if burst_parent.exists() and burst_parent.is_dir():
-        # New style: bursts in parent folder
         burst_folders = [f for f in burst_parent.iterdir() if f.is_dir()]
     else:
-        # Old style: bursts in root (fallback for backward compatibility)
         burst_folders = list(directory.glob("burst-*/"))
     
     for burst_folder in burst_folders:
         if burst_folder.is_dir():
             for f in burst_folder.iterdir():
-                # V9.2: Match both old-style _PICK_ and new-style name_PICK
                 if f.is_file() and (f.name.startswith(BEST_PICK_PREFIX) or is_already_ai_named(f.name)):
                     hero_files.append(f)
 
     if not hero_files:
-        print("\n  No 'Keepers' or '_PICK_' files found. Nothing to archive.")
+        print(f"\n  No '{TIER_A_FOLDER}' or '_PICK_' files found. Nothing to archive.")
         print("   Auto workflow complete.")
         return
 
-    print(f"   Found {len(hero_files)} 'hero' files to AI-name and archive.")
+    # === V9.3: ENHANCED PROGRESS MESSAGING ===
+    already_named = [f for f in hero_files if is_already_ai_named(f.name)]
+    needs_naming = [f for f in hero_files if not is_already_ai_named(f.name)]
     
-    # === FIX #1 START ===
-    # Calculate total size before processing
+    print(f"   Found {len(hero_files)} 'hero' files total:")
+    if already_named:
+        print(f"     • {len(already_named)} already AI-named (from burst stacking)")
+    print(f"     • {len(needs_naming)} to process")
+    # === END V9.3 ENHANCEMENT ===
+    
     total_size_before = 0
     for f in hero_files:
         try:
@@ -2303,22 +2207,21 @@ def auto_workflow(directory: Path, chosen_destination: Path, dry_run: bool, APP_
         except Exception:
             pass
     tracker.add_size_before(total_size_before)
-    # === FIX #1 END ===
-    
-    # v8.0 GM PATCH: Commenting out until SessionTracker stats are fixed tomorrow
-    # tracker.increment_stat('total_files', len(hero_files))
     
     results = {"success": [], "failed": []}
+    
+    # v9.3: Initialize rename log
+    rename_log_path = chosen_destination / f"_ai_rename_log_{SESSION_TIMESTAMP}.txt"
+    if not dry_run:
+        initialize_rename_log(rename_log_path)
     
     pbar = None
     if TQDM_AVAILABLE:
         pbar = SmartProgressBar(total=len(hero_files), desc=" 🤖 Archiving", unit="img")
     
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # v7.1 (Patched): Files are processed into the ROOT destination (`chosen_destination`)
-        # This is the "files_source" for the next step.
         future_to_file = {
-            executor.submit(process_single_image, img_path, chosen_destination, chosen_model, dry_run=False): img_path 
+            executor.submit(process_single_image, img_path, chosen_destination, chosen_model, dry_run, rename_log_path): img_path 
             for img_path in hero_files
         }
         
@@ -2331,21 +2234,15 @@ def auto_workflow(directory: Path, chosen_destination: Path, dry_run: bool, APP_
                     "new_name": message,
                     "description": description
                 })
-                # === FIX #2 START ===
-                # Track successful image
                 try:
                     file_size = original.stat().st_size
                     tracker.record_image(file_size, success=True)
                     tracker.add_size_after(file_size)
                 except Exception:
                     pass
-                # === FIX #2 END ===
             else:
                 results["failed"].append((original.name, message))
-                # === FIX #3 START ===
-                # Track failed image
                 tracker.record_image(0, success=False)
-                # === FIX #3 END ===
                 if pbar:
                     pbar.write(f" ❌ {original.name}: {message}")
             
@@ -2358,45 +2255,34 @@ def auto_workflow(directory: Path, chosen_destination: Path, dry_run: bool, APP_
     print(f"\n{'='*60}")
     print(f" ✅ Successfully archived: {len(results['success'])}")
     print(f" ❌ Failed to archive: {len(results['failed'])}")
-    
-    # v8.0 GM PATCH: Commenting out until SessionTracker stats are fixed tomorrow
-    # tracker.increment_stat('ai_named', len(results['success']))
-    # tracker.increment_stat('failed', len(results['failed']))
 
     if results["success"]:
-        # v7.1: Generate AI session name
         categories = {}
         for item in results["success"]:
             cat = categorize_description(item["description"])
             categories[cat] = categories.get(cat, 0) + 1
         
-        # v8.0 GM PATCH: Commenting out until SessionTracker stats are fixed tomorrow
-        # for cat, count in categories.items():
-        #     tracker.add_category_count(cat, count)
-        
         session_name = generate_ai_session_name(categories, chosen_model)
         
-        # v7.1 (Patched): Stronger check for valid AI name
         if session_name and len(session_name) > 2:
             dated_folder = f"{SESSION_DATE}_{session_name}"
             print(f"\n   🎨 AI Session Name: {dated_folder}")
         else:
             dated_folder = f"{SESSION_DATE}_Session"
         
-        # This is the *final* session folder, e.g., ".../test/2025-11-07_Vibe"
         final_destination = chosen_destination / dated_folder
         final_destination.mkdir(parents=True, exist_ok=True)
         tracker.set_destination(final_destination)
         
-        # v7.1 (Patched): Pass correct source and destination paths
-        # Move files from `chosen_destination` (root) into `final_destination` (session folder)
         organize_into_folders(results["success"], chosen_destination, final_destination, dry_run=False)
 
     print("\n" + "="*60)
     print(" 🚀 AUTO WORKFLOW COMPLETE")
     print("="*60)
     print(f" Your 'hero' photos are now in: {chosen_destination}")
-    print(f"  Remaining 'duds' and 'bursts' are in: {directory}")
+    print(f"  Remaining files are in: {directory}")
+    if not dry_run:
+        print(f" 📝 Rename log saved: {rename_log_path.name}")
 
     # v7.1: Print session summary
     print("\n")
@@ -2406,27 +2292,22 @@ def auto_workflow(directory: Path, chosen_destination: Path, dry_run: bool, APP_
 # --- Legacy Ingest Workflow ---
 
 def run_default_ingest(current_dir: Path, dry_run: bool, APP_CONFIG: dict):
-    """(V7.1) Runs the original V4.1 AI-powered ingest process,
-    refactored to use v7.1 directory selector."""
+    """(V7.1) Runs the original V4.1 AI-powered ingest process"""
     
     print(f"\n{'='*60}")
     print(f" 🤖 PhotoSort --- (Legacy Ingest Mode)")
     print(f"{'='*60}")
     
-    # v7.1: Use directory selector
     print(" ⓘ  Legacy mode selected. Please choose source and destination.")
     source, destination = get_source_and_destination(APP_CONFIG)
     if not source or not destination:
         print(get_quit_message())
         return
     
-    # Update config with last paths
     update_config_paths(APP_CONFIG, CONFIG_FILE_PATH, str(source), str(destination))
 
-    # v7.1: Get model (still uses old prompt, but that's ok for legacy)
     print(f"\n 🤖 Default model: {APP_CONFIG['default_model']}")
     
-    # v7.1 GM 3.0: Add model loading spinner
     loader = ModelLoadingProgress(message="Checking Ollama connection...")
     loader.start()
     available_models = get_available_models()
@@ -2460,10 +2341,8 @@ def run_default_ingest(current_dir: Path, dry_run: bool, APP_CONFIG: dict):
 def main():
     """Main entry point with smart banner system"""
     
-    # Check for dcraw on startup
     check_dcraw()
     
-    # V7.0: Load config from file or use defaults
     APP_CONFIG = load_app_config()
 
     current_dir = Path.cwd()
@@ -2471,7 +2350,6 @@ def main():
     
     dry_run = "--preview" in args or "-p" in args
     
-    # V7.0 GOLD: Updated dispatch table - ALL COMMANDS GET ANIMATED BANNER!
     DISPATCH_TABLE = {
         '--auto': (auto_workflow, V5_LIBS_AVAILABLE and V6_CULL_LIBS_AVAILABLE, V5_LIBS_MSG if not V5_LIBS_AVAILABLE else V6_LIBS_MSG, "animated"),
         '--group-bursts': (group_bursts_in_directory, V5_LIBS_AVAILABLE, V5_LIBS_MSG, "animated"),
@@ -2486,28 +2364,20 @@ def main():
         '--art': (critique_images_in_directory, V5_LIBS_AVAILABLE, V5_LIBS_MSG, "animated"),
     }
     
-    # GOLD: Clean CLI args (exclude --model and its value)
     cli_model = parse_model_override()
     clean_args = args - {"--preview", "-p", "--model"}
     if cli_model:
         clean_args = clean_args - {cli_model}
     
-    # Find command
     command_to_run = None
     for flag in clean_args:
         if flag in DISPATCH_TABLE:
             command_to_run = flag
             break
     
-    # v7.1: Refactored main dispatcher
     if command_to_run == '--auto':
-        # v7.1: Use directory selector for auto mode
-        
-        # === BANNER FIX ===
-        # Show banner FIRST, before directory selection
         show_banner("animated")
         
-        # v8.0 GM: Add workflow mantra and pro-tip
         if COLORAMA_AVAILABLE:
             print(f"{Fore.CYAN}{Style.BRIGHT}  Mantra: Stats → Stack → Cull → Critique{Style.RESET_ALL}")
             print(f"{Fore.YELLOW}  💡 Pro-tip: Copy media to local storage before running for best performance{Style.RESET_ALL}\n")
@@ -2515,7 +2385,6 @@ def main():
             print("  Mantra: Stats → Stack → Cull → Critique")
             print("  💡 Pro-Loop: Copy media to local storage before running for best performance\n")
         
-        # v8.0 GM: Show dry run banner if preview mode
         if dry_run:
             print("="*60)
             if COLORAMA_AVAILABLE:
@@ -2525,26 +2394,19 @@ def main():
                 print("  🔍 DRY RUN: AUTO WORKFLOW PREVIEW MODE")
                 print("  NO FILES WILL BE MOVED/COPIED/WRITTEN")
             print("="*60 + "\n")
-        # === END BANNER FIX ===
         
         source, destination = get_source_and_destination(APP_CONFIG)
         if not source or not destination:
             print(get_quit_message())
             return
         
-        # Update config with last paths
         update_config_paths(APP_CONFIG, CONFIG_FILE_PATH, str(source), str(destination))
         
-        # Run workflow (banner is shown *after* path selection)
-        # show_banner("animated") # <-- MOVED UP
-        
-        # Call auto_workflow with new signature
         auto_workflow(source, destination, dry_run, APP_CONFIG)
 
-    elif command_to_run: # All other commands
+    elif command_to_run:
         (func_to_call, libs_ok, lib_msg, banner_mode) = DISPATCH_TABLE[command_to_run]
         
-        # Show banner FIRST
         show_banner(banner_mode)
         
         if not libs_ok:
@@ -2557,7 +2419,6 @@ def main():
             print(" NO FILES WILL BE MOVED/COPIED/WRITTEN")
             print("="*60)
         
-        # Call the feature function
         func_to_call(current_dir, dry_run, APP_CONFIG)
 
     else:
@@ -2572,11 +2433,11 @@ def main():
             print("  --critique, --art: (V7.0) Run AI 'Creative Director' on a folder, save .json sidecars")
             print("  --stats, --exif  : Display EXIF insights dashboard")
             print("  --group-bursts, -b : Stack visually similar burst shots, mark best pick")
-            print("  --cull, -c       : Sort images into _Keepers, _Review_Maybe, _Review_Duds")
-            print("  --prep, --pe     : Find 'Good' images and copy to _ReadyForLightroom")
+            print("  --cull, -c       : Sort images into _Tier_A, _Tier_B, _Tier_C")
+            print("  --prep, --pe     : Find 'Tier A' images and copy to _ReadyForLightroom")
             print("\nOptions:")
             print("  --preview, -p    : Dry run mode (no files moved/copied/written)")
-            print("  --model <name>   : Override config model (for --critique only)")
+            print("  --model <n>   : Override config model (for --critique only)")
             print("  --help, -h       : Show this help message")
             
             if not TQDM_AVAILABLE:
@@ -2585,7 +2446,6 @@ def main():
                 print("\n Tip: Install colorama for animated banner: pip3 install colorama")
             return
 
-        # Default: Legacy ingest
         show_banner("animated")
         
         if dry_run:
@@ -2594,7 +2454,6 @@ def main():
             print(" NO FILES WILL BE MOVED")
             print("="*60)
         
-        # v7.1: This function is now refactored
         run_default_ingest(current_dir, dry_run, APP_CONFIG)
     
     if dry_run and command_to_run not in ('--auto',):
