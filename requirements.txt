@@ -8,6 +8,7 @@ Pillow>=10.0.0              # Image processing
 requests>=2.31.0            # API calls to Ollama
 numpy>=1.24.0               # Numerical operations
 colorama>=0.4.6             # Terminal colors (CLI)
+exifread>=3.0.0             # EXIF metadata reading
 
 # ============================================
 # TUI Interface (v12.1+)
