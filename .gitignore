@@ -193,3 +193,19 @@ config_personal.ini
 !LICENSE
 !requirements.txt
 !setup.py
+
+# Test files
+test_*.jpg
+test_*.py
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environments
+venv/
+.venv/
