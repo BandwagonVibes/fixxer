@@ -937,6 +937,123 @@ Respond with ONLY a single JSON object in this exact format:
 # VIII. FEATURE WORKFLOWS (The "Tools")
 # ==============================================================================
 
+# --- Simple Sort Workflow (Legacy Mode) ---
+
+def simple_sort_workflow(
+    log_callback: Callable[[str], None] = no_op_logger,
+    app_config: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Simple workflow: AI name + organize by keyword into folders.
+    No burst detection, no culling - just straightforward naming and sorting.
+    Perfect for home users who want a simple "point and organize" experience.
+    
+    This is the "legacy mode" from the original CLI photosort.py that just:
+    1. AI names all images
+    2. Groups them into folders by keyword
+    That's it. Powerful for the home user who just needs to organize photos.
+    """
+    start_time = datetime.now()
+    
+    if app_config is None:
+        app_config = load_app_config()
+    
+    source_str = app_config.get('last_source_path')
+    dest_str = app_config.get('last_destination_path')
+    chosen_model = app_config.get('default_model', DEFAULT_MODEL_NAME)
+    
+    if not source_str or not dest_str:
+        log_callback("[bold red]✗ FATAL: Source or Destination not set in config.[/bold red]")
+        return {}
+    
+    directory = Path(source_str)
+    chosen_destination = Path(dest_str)
+    
+    if not directory.is_dir():
+        log_callback(f"[bold red]✗ FATAL: Source directory not found:[/bold red] {directory}")
+        return {}
+    
+    try:
+        chosen_destination.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        log_callback(f"[bold red]✗ FATAL: Could not create destination:[/bold red] {e}")
+        return {}
+    
+    # Create temp staging area for renamed files
+    temp_staging = chosen_destination / "_staging"
+    temp_staging.mkdir(exist_ok=True)
+    
+    log_callback(f"\n[bold cyan]📁 Simple Sort: AI Naming + Keyword Folders[/bold cyan]")
+    log_callback(f"   Source:      {directory}")
+    log_callback(f"   Destination: {chosen_destination}")
+    log_callback(f"   Model:       {chosen_model}")
+    
+    check_dcraw(log_callback)
+    
+    # Get all image files
+    image_files = []
+    for ext in SUPPORTED_EXTENSIONS:
+        image_files.extend(directory.glob(f"*{ext}"))
+    
+    if not image_files:
+        log_callback("[yellow]No image files found in source directory.[/yellow]")
+        return {}
+    
+    log_callback(f"\n   Found {len(image_files)} images to process")
+    
+    # Process images: AI naming
+    log_callback("\n[bold]🤖 AI Naming Images...[/bold]")
+    processed_files = []
+    success_count = 0
+    
+    for idx, img in enumerate(image_files, 1):
+        log_callback(f"   [{idx}/{len(image_files)}] {img.name}")
+        original_path, success, new_name, description = process_single_image(
+            img, temp_staging, chosen_model, log_callback=log_callback
+        )
+        
+        if success:
+            processed_files.append({
+                'original': original_path.name,
+                'new_name': new_name,
+                'description': description
+            })
+            success_count += 1
+        else:
+            log_callback(f"     [red]Failed: {new_name}[/red]")
+    
+    log_callback(f"\n   [green]✓[/green] Successfully named {success_count}/{len(image_files)} images")
+    
+    if not processed_files:
+        log_callback("[yellow]No files were successfully processed.[/yellow]")
+        try:
+            temp_staging.rmdir()
+        except:
+            pass
+        return {}
+    
+    # Organize into keyword folders
+    log_callback("\n[bold]📂 Organizing into Keyword Folders...[/bold]")
+    organize_into_folders(processed_files, temp_staging, chosen_destination, log_callback)
+    
+    # Clean up staging directory
+    try:
+        temp_staging.rmdir()
+    except:
+        pass
+    
+    duration = datetime.now() - start_time
+    log_callback(f"\n[bold green]✓ Simple Sort Complete![/bold green]")
+    log_callback(f"   Duration: {format_duration(duration)}")
+    log_callback(f"   {success_count} images organized into folders")
+    
+    return {
+        'total_images': len(image_files),
+        'success_count': success_count,
+        'duration': str(duration)
+    }
+
+
 # --- Auto Workflow ---
 
 def auto_workflow(

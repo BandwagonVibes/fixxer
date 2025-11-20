@@ -57,6 +57,7 @@ except ImportError:
 try:
     from photosort_engine import (
         auto_workflow,
+        simple_sort_workflow,  # NEW: Simple legacy mode workflow
         group_bursts_in_directory,
         cull_images_in_directory,
         show_exif_insights,
@@ -81,6 +82,12 @@ except ImportError as e:
         }
     
     def auto_workflow(log_callback, app_config):
+        log_callback(f"🚀 [Test Mode] Engine import failed: {ENGINE_IMPORT_ERROR}")
+        import time
+        time.sleep(1)
+        return {}
+    
+    def simple_sort_workflow(log_callback, app_config):
         log_callback(f"🚀 [Test Mode] Engine import failed: {ENGINE_IMPORT_ERROR}")
         import time
         time.sleep(1)
@@ -317,12 +324,25 @@ class DirectorySelectScreen(ModalScreen[Optional[Path]]):
     
     @on(DirectoryTree.NodeSelected)
     def on_directory_selected(self, event: DirectoryTree.NodeSelected) -> None:
-        if event.node.data and event.node.data.path.is_dir():
-            self.selected_path = event.node.data.path
-            self.query_one("#path-display", Static).update(f"Selected: {event.node.data.path}")
+        if event.node.data and hasattr(event.node.data, 'path'):
+            path = event.node.data.path
+            if path.is_dir():
+                self.selected_path = path
+                self.query_one("#path-display", Static).update(f"Selected: {path}")
     
     @on(Button.Pressed, "#btn-select")
     def on_select(self) -> None:
+        # Get the currently selected path from the tree
+        try:
+            tree = self.query_one("#dir-tree", DirectoryTree)
+            if tree.cursor_node and tree.cursor_node.data and hasattr(tree.cursor_node.data, 'path'):
+                selected = tree.cursor_node.data.path
+                if selected.is_dir():
+                    self.selected_path = selected
+        except Exception:
+            pass
+        
+        # Dismiss with the selected path
         self.dismiss(self.selected_path)
     
     @on(Button.Pressed, "#btn-cancel")
@@ -565,7 +585,10 @@ class PhotoSortTUI(App):
     def compose(self) -> ComposeResult:
         # No Header
         # The app title is now part of the logo/header area
-        yield Static(self.get_vision_crew_logo(), id="logo")
+        # NEW: Add horizontal container for logo + Easy Archive button
+        with Horizontal(id="header-row"):
+            yield Static(self.get_vision_crew_logo(), id="logo")
+            yield Button("Easy Archive", id="btn-easy", variant="default", classes="easy-btn")
         
         with Horizontal(id="main-layout"):
             with Vertical(id="left-panel"):
@@ -1046,6 +1069,23 @@ class PhotoSortTUI(App):
             self.start_progress_tracking()
             self.run_in_thread(self.run_critique_workflow_thread, "CritiqueWorkflow")
     
+    @on(Button.Pressed, "#btn-easy")
+    def handle_easy_button(self, event: Button.Pressed) -> None:
+        """Handle Easy Archive button - Simple sort workflow (legacy mode)"""
+        if self.workflow_active:
+            self.write_to_log("[red]A workflow is already running![/red]")
+            return
+            
+        if not self.check_paths_configured():
+            return
+            
+        self.toggle_workflow_buttons(disabled=True)
+        self.write_to_log("=" * 50)
+        self.write_to_log("[bold green]Starting EASY ARCHIVE[/bold green]")
+        self.write_to_log("[dim]Simple AI naming + keyword folder organization[/dim]")
+        self.start_progress_tracking()
+        self.run_in_thread(self.run_easy_workflow_thread, "EasyWorkflow")
+    
     def check_paths_configured(self) -> bool:
         if not self.app_config.get('last_source_path') or not Path(self.app_config['last_source_path']).is_dir():
             self.write_to_log("[red]✗ Source path not set or invalid. Use 'Set Source (1)' button first.[/red]")
@@ -1147,6 +1187,7 @@ class PhotoSortTUI(App):
             # Check if critique function exists in engine
             try:
                 from photosort_engine import critique_single_image
+                import json
                 
                 # Get first image from source directory for critique
                 source_path = self.app_config.get('last_source_path')
@@ -1174,6 +1215,15 @@ class PhotoSortTUI(App):
                     self.write_to_log("\n[bold]📝 AI Critique Results:[/bold]")
                     for key, value in result.items():
                         self.write_to_log(f"   [cyan]{key}:[/cyan] {value}")
+                    
+                    # Save JSON file alongside the image
+                    json_path = image_file.with_suffix('.json')
+                    try:
+                        with open(json_path, 'w', encoding='utf-8') as f:
+                            json.dump(result, f, indent=2, ensure_ascii=False)
+                        self.write_to_log(f"   [dim]Saved critique to: {json_path.name}[/dim]")
+                    except Exception as e:
+                        self.write_to_log(f"[yellow]Warning: Could not save JSON: {e}[/yellow]")
                 
                 self.write_to_log("[bold green]✓ Critique completed![/bold green]")
                 self.update_status("✅ Critique Complete", {})
@@ -1183,6 +1233,22 @@ class PhotoSortTUI(App):
                 self.update_status("⚠️ Not Available", {})
         except Exception as e:
             self.write_to_log(f"[bold red]✗ Critique failed: {e}[/bold red]")
+            self.update_status("❌ Error", {})
+        finally:
+            self.call_from_thread(self.on_workflow_complete)
+    
+    def run_easy_workflow_thread(self) -> None:
+        """Run the simple sort workflow (legacy mode)"""
+        try:
+            self.update_status("🗂️ Easy Archive Running...", {})
+            result = simple_sort_workflow(
+                log_callback=self.write_to_log,
+                app_config=self.app_config
+            )
+            self.write_to_log("[bold green]✓ Easy Archive complete![/bold green]")
+            self.update_status("✅ Archive Complete", result if isinstance(result, dict) else {})
+        except Exception as e:
+            self.write_to_log(f"[bold red]✗ Easy Archive failed: {e}[/bold red]")
             self.update_status("❌ Error", {})
         finally:
             self.call_from_thread(self.on_workflow_complete)

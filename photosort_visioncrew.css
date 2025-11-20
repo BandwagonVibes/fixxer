@@ -20,11 +20,34 @@ Screen {
  * Layout & Containers
  * ============================================================================== */
 
-#logo {
+#header-row {
+    height: auto;
     width: 100%;
+    align: left middle;
+}
+
+#logo {
+    width: 1fr;
     height: auto;
     text-align: left;  /* Left-aligned logo */
     padding: 1 2;
+}
+
+.easy-btn {
+    width: auto;
+    height: auto;
+    min-width: 14;
+    margin: 1 2 1 0;
+    background: $surface;
+    color: $primary;
+    border: solid $primary 50%;
+}
+
+.easy-btn:hover {
+    background: $primary;
+    color: $background;
+    border: solid $primary;
+    text-style: bold;
 }
 
 .panel-title {
