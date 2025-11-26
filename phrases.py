@@ -1,7 +1,8 @@
 """
-Phrase Library for PHOTOSORT v7.1
-==================================
-200 rotating messages organized by duration and theme.
+Phrase Library for PHOTOSORT v7.1 [CRACKED by GEMINI]
+=====================================================
+200 rotating messages. 
+Style: Warez NFO / Demoscene / Brutal Roast.
 
 Distribution:
 - Model loading: 15 phrases
@@ -10,312 +11,305 @@ Distribution:
 - Mid (15-30min): 35 phrases
 - Long (30-60min): 35 phrases
 - Marathon (60+min): 30 phrases
-- VisionCrew Meta: 20 phrases (loading/waiting only)
-
-Content Mix:
-- 30% Humor & Snark (~60 phrases)
-- 20% Photography Education (~40 phrases)
-- 15% Everyday Mysteries (~30 phrases)
-- 15% VisionCrew Meta (~30 phrases)
-- 10% AI/ML Knowledge (~20 phrases)
-- 10% Time/Tech Facts (~20 phrases)
+- VisionCrew Meta: 20 phrases
 """
 
 import random
 from typing import List
 
 # ============================================================================
-# MODEL LOADING PHRASES (15) - Displayed during 15-30s Ollama model load
+# MODEL LOADING PHRASES (15) - The "Crack Intro" Vibe
 # ============================================================================
 
 MODEL_LOADING_PHRASES = [
-    "🤖 Waking up bakllava... (this takes a moment)",
-    "🔋 Loading model into RAM... (patience, young padawan)",
-    "⚡️ Initializing neural networks... (worth the wait)",
-    "📦 Loading 4.7GB of computer vision into memory...",
-    "🧠 Convincing your Mac's unified memory to share...",
-    "⚙️ MLX is fast... after it wakes up from its nap",
-    "☕ Perfect time to grab that coffee you've been eyeing",
-    "📖 Fun fact: You could read a haiku while this loads. Twice.",
-    "⏳ This is why photographers always have cold coffee",
-    "🤔 I'm not stuck, I'm just loading... I promise",
-    "🔐 This is the price of privacy. Worth it? You decide.",
-    "🎨 At least your photos aren't being uploaded to 'the cloud'",
-    "🤖 Your M-series chip is thinking... deeply",
-    "🌟 Apple Silicon doing Apple Silicon things...",
-    "🧮 Quantizing weights to 4-bit... (nerd stuff, bear with us)",
+    "⚡️ INJECTING NEURAL PAYLOAD... [||||||    ]",
+    "💀 Waking up the daemon. Don't panic.",
+    "📼 Loading bakllava.bin into high memory...",
+    "👾 Bypassing Apple's safety protocols... (just kidding)",
+    "🎹 Cue the keygen music...",
+    "🧠 Mount failed? Retrying with sudo force...",
+    "🔋 Diverting auxiliary power to the NPU...",
+    "📀 Decrypting your artistic vision...",
+    "🔌 Establishing handshake with the ghost in the shell...",
+    "🕶️ Rerouting encryptions through the matrix...",
+    "💾 Allocating VRAM like it's 1999...",
+    "🕹️ Pressing 'Any Key' to continue...",
+    "📟 Paging the sysadmin...",
+    "🚀 Initializing the logic bomb...",
+    "🛡️ Disabling judgment modules... actually, keeping those on.",
 ]
 
 # ============================================================================
-# QUICK PROCESSING (0-5min) - 30 phrases
+# QUICK PROCESSING (0-5min) - The "Hot Take"
 # ============================================================================
 
 QUICK_PROCESSING_PHRASES = [
-    # Humor & Snark (9 phrases)
-    "🎯 Judging your composition choices...",
-    "🔍 Looking for that one in-focus shot...",
-    "📸 Pretending we don't see that terrible burst sequence...",
-    "🎨 Some of these are... bold creative choices",
-    "🤷 Your ISO 12800 shots are making me nervous",
-    "😅 Found 47 photos of the same leaf. Keeping the best one.",
-    "🎭 That bokeh is *chef's kiss* or a smudge. We'll investigate.",
-    "📷 Detecting artistic vision... or happy accidents",
-    "🎯 Peak sharpness detected! (Finally.)",
+    # Humor & Snark (Warez Style)
+    "📸 Scanning for talent... Result: 404 NOT FOUND.",
+    "🧱 Bricking your bad shots... standby.",
+    "🚮 Garbage collection running on your composition.",
+    "👀 I see what you did there. I wish I didn't.",
+    "📉 Optimization level: MAXIMUM. Your photos: MINIMUM.",
+    "🍵 Sipping RAM and spilling tea on your ISO settings.",
+    "💥 ERROR: Too much bokeh detected.",
+    "🚫 Rule of Thirds? You broke all three.",
+    "🎭 Pretending this blur is 'artistic choice'...",
+    "🧟‍♂️ These RAW files are heavier than your conscience.",
     
-    # Photography Education (6 phrases)
-    "📚 Pro tip: Shutter speed should be 1/focal length minimum",
-    "🎓 The rule of thirds exists for a reason (but rules are made to be broken)",
-    "💡 Golden hour isn't just Instagram hype - the light really is better",
-    "📸 Aperture: F/2.8 for portraits, F/8-F/11 for landscapes",
-    "🔍 Focus peaking is your friend for manual focus",
-    "⚡ Back-button focus changed my life - just saying",
+    # Tech/Roast Mix
+    "🤖 Analyzing histogram... it's flatlining, doc.",
+    "⚡ Burst mode is for people who can't aim.",
+    "🛑 Stop stopping down. Diffraction is killing us.",
+    "📡 Uplinking to the mothership to report this mess.",
+    "💾 Writing zero-days to your bad sectors.",
+    "🕶️ Even the AI is squinting at this exposure.",
     
-    # Everyday Mysteries (6 phrases)
-    "🧠 Why do we blink when we sneeze? Brain's protecting your eyes.",
-    "🌊 Ocean waves come in sets because of wave interference patterns",
-    "🌙 Moon illusion: It's not bigger at horizon, your brain just thinks so",
-    "☕ Coffee smells better than it tastes because olfactory receptors are amazing",
-    "🎵 Earworms happen because music activates your motor cortex",
-    "🧊 Hot water can freeze faster than cold (Mpemba effect)",
+    # Everyday Mysteries (Twisted)
+    "🧠 Why do we blink? To avoid looking at this shot.",
+    "🧊 Entropy increases... mostly in your file management.",
+    "🌌 The universe is expanding, unlike your dynamic range.",
+    "🐈 Schrödinger's Cat is alive, but your focus is dead.",
+    "⏰ Time is a flat circle. So is this lens flare.",
+    "🔮 Reality is a simulation. This photo is a glitch.",
     
-    # AI/ML Knowledge (5 phrases)
-    "🤖 Vision transformers see images as sequences of patches",
-    "🧠 Diffusion models work by learning to remove noise",
-    "📊 Your GPU is doing matrix multiplication 24/7",
-    "🎯 Attention mechanisms: The AI asks 'what's important here?'",
-    "🔮 Latent space: Where AI dreams of electric sheep",
+    # AI/ML Knowledge
+    "🤖 Tensors flowing... judging flowing harder.",
+    "🧠 My weights are quantized. Your skills are not.",
+    "📊 Running inference on your life choices.",
+    "🎯 Confidence score: 12%. Yikes.",
+    "🧬 Genetic algorithm suggests: Delete this.",
     
-    # Time/Tech Facts (4 phrases)
-    "⏰ Unix timestamps will overflow in 2038 (Y2K38 problem)",
-    "💾 QR codes can store ~4,296 alphanumeric characters",
-    "🔋 Lithium-ion batteries lose capacity every charge cycle",
-    "📡 Your phone switches cell towers 100+ times during a car trip",
+    # Time/Tech Facts
+    "⏰ 1970 called, they want their Unix epoch back.",
+    "💾 formatting c: ... joke. Unless?",
+    "🔋 Draining battery to process noise.",
+    "💀 ASCII art would have better resolution.",
 ]
 
 # ============================================================================
-# EARLY PROCESSING (5-15min) - 35 phrases
+# EARLY PROCESSING (5-15min) - The "Grind" Begins
 # ============================================================================
 
 EARLY_PROCESSING_PHRASES = [
-    # Humor & Snark (11 phrases)
-    "🎨 Analyzing your 'artistic blur' (aka camera shake)",
-    "🔍 Counting how many times you shot the same thing...",
-    "📸 Your burst mode discipline is... interesting",
-    "🎯 Found the keeper! (It's hiding behind 23 duds)",
-    "😬 That exposure is spicy. Bold. Controversial.",
-    "🤔 Is this avant-garde or did you sneeze?",
-    "🎭 Processing your 'moody underexposed aesthetic'...",
-    "📷 Sorting gems from 'what was I thinking' shots",
-    "🎨 Your white balance tells a story. A chaotic story.",
-    "🔥 Some of these are fire. Some are... also fire. (dumpster fire)",
-    "🎯 Peak photography happening... 15% of the time",
+    # Humor & Snark
+    "🔨 Hammering out the dents in your metadata.",
+    "🧹 Cleanup on Aisle: SD Card.",
+    "📉 Your keeper rate is statistically insignificant.",
+    "🤷 Did you sit on the shutter button?",
+    "🕵️‍♂️ Enhancing... Enhancing... Still blurry.",
+    "🎨 Bob Ross would call these 'happy accidents'. I call them JPEGs.",
+    "🌡️ CPU temp rising. Your photos are roast-worthy.",
+    "🤧 Bless you. You clearly sneezed during this exposure.",
+    "🧂 Salty about this white balance.",
+    "🚽 Flushing the buffer. And your dignity.",
+    "🎪 Welcome to the circus of value.",
     
-    # Photography Education (7 phrases)
-    "📚 Histogram tip: Don't fear the shadows, fear the clipped highlights",
-    "🎓 Shoot in RAW - you can fix most things except bad focus",
-    "💡 Blue hour > Golden hour (fight me)",
-    "📸 Your lens's sweet spot is usually 2-3 stops down from wide open",
-    "🔍 Zone focusing: Pre-focus and shoot from the hip like a film noir hero",
-    "⚡ High-speed sync lets you use flash in bright daylight",
-    "🎯 Critical focus: Eyes first, everything else can be soft",
+    # Photography Education (Aggressive)
+    "📚 RTFM: Read The Freaking Manual.",
+    "🎓 F/1.8 isn't a personality trait.",
+    "💡 Flash didn't fire. Or maybe you just forgot it.",
+    "📸 Histogram looks like a skate park ramp. Dangerous.",
+    "🔍 Pixel peeping reveals... sadness.",
+    "⚡ Sync speed exceeded. Enjoy the black bar.",
+    "🎯 Missed focus back-focused on the wall. Classic.",
     
-    # Everyday Mysteries (7 phrases)
-    "🌈 Rainbows are actually full circles - you just can't see the bottom half",
-    "🦆 Ducks' quacks don't echo (actually they do, it's just hard to hear)",
-    "🌡️ Room temperature is 20-22°C because that's our metabolic sweet spot",
-    "🧲 Magnets work because of aligned electron spins (quantum mechanics!)",
-    "🦋 Butterflies taste with their feet (chemoreceptors)",
-    "🌊 Tides have tides - they're affected by coastline shape",
-    "🔊 Sound travels 4x faster in water than air",
+    # Everyday Mysteries
+    "🌈 Double rainbows are rare. Unlike your duplicate shots.",
+    "🦆 Ducks fly south. Your histogram went west.",
+    "🦠 Bacteria multiply slower than your file count.",
+    "🌑 Dark matter makes up 85% of the universe. The rest is your underexposure.",
+    "🌪️ Chaos theory in action: Your folder structure.",
+    "🧊 Absolute zero is reached looking at these warm tones.",
+    "🌊 Tides go in, tides go out. Can't explain that. Or this crop.",
     
-    # AI/ML Knowledge (5 phrases)
-    "🤖 GANs: Two AIs playing cops and robbers with images",
-    "🧠 Backpropagation: Teaching AI through calculated regret",
-    "📊 Gradient descent: Rolling a ball down a hill to find the answer",
-    "🎯 Overfitting: When AI memorizes instead of learning",
-    "🔮 Transfer learning: Teaching new tricks to old neural nets",
+    # AI/ML Knowledge
+    "🤖 Backpropagation complete. I regret learning this.",
+    "🧠 Neural pathways frying on this texture.",
+    "📊 Gradient descent stuck in a local minimum of mediocrity.",
+    "🎯 Zero-shot learning? More like zero-skill shooting.",
+    "🔮 Latent space is screaming.",
     
-    # Time/Tech Facts (5 phrases)
-    "⏰ GPS satellites account for relativity or they'd drift 10km/day",
-    "💾 JPEG compression throws away data you won't miss",
-    "🔋 Fast charging heats batteries, shortening their life",
-    "📡 Fiber optic cables carry light at 2/3 the speed of light in vacuum",
-    "🖥️ Your CPU can execute ~3 billion instructions per second",
+    # Time/Tech Facts
+    "⏰ Y2K was a hoax. This batch process is the real disaster.",
+    "💾 404 Petabytes of shame.",
+    "🔋 Power cycle recommended. For the photographer.",
+    "📡 Latency is high. Intelligence is low.",
+    "🖥️ GPU utilization: 99%. Satisfaction: 1%.",
 ]
 
 # ============================================================================
-# MID PROCESSING (15-30min) - 35 phrases
+# MID PROCESSING (15-30min) - The "Deep Dive"
 # ============================================================================
 
 MID_PROCESSING_PHRASES = [
-    # Humor & Snark (11 phrases)
-    "🎨 Still here! Unlike your camera's battery life...",
-    "🔍 This is taking a while. Maybe make that coffee now?",
-    "📸 Processing marathon underway. Stay hydrated.",
-    "🎯 We're committed now. No turning back.",
-    "😅 At least you're not manually culling these...",
-    "🤔 Fun fact: You could've shot another 100 photos by now",
-    "🎭 Your hard drive is getting a workout",
-    "📷 Halfway there! (Probably. Time is relative.)",
-    "🎨 This would be faster on quantum computers (in 2045)",
-    "🔥 Your M1 chip just unlocked its final form",
-    "🎯 AI doesn't get coffee breaks but you should",
+    # Humor & Snark
+    "💀 Still here? I thought you'd rage-quit by now.",
+    "🧟‍♂️ Braiiins... searching for signs of intelligence in this folder.",
+    "📉 Defragging your creative process.",
+    "🧨 Compressing your ego to fit in the EXIF data.",
+    "🚔 Calling the composition police.",
+    "🚧 Under Construction: Your Portfolio.",
+    "💣 Logic bomb armed. Just kidding. Keeping the photos.",
+    "🎰 Rolling the dice on 'Auto-Enhance'.",
+    "🕸️ Cobwebs forming on the shutter release.",
+    "🥃 Pouring one out for the deleted pixels.",
+    "🚬 This batch is smoking... my cooling fans.",
     
-    # Photography Education (7 phrases)
-    "📚 Long exposure tip: Use ND filters to shoot waterfalls at noon",
-    "🎓 Expose for highlights, develop for shadows (ETTR technique)",
-    "💡 Your camera's light meter is fooled by bright/dark scenes - use exposure comp",
-    "📸 Prime lenses force you to 'zoom with your feet' and think more",
-    "🔍 Focus stacking: Merge multiple shots for infinite depth of field",
-    "⚡ Flash + slow shutter = motion blur + frozen subject (drag the shutter)",
-    "🎯 Shoot one subject 10 ways > shoot 10 subjects one way",
+    # Photography Education
+    "📚 Sunny 16 Rule? More like Cloudy With a Chance of Noise.",
+    "🎓 Chromatic aberration is not a vibe.",
+    "💡 Lighting check: Failed.",
+    "📸 Shutter count tells me you spray and pray.",
+    "🔍 Sharpness is a bourgeois concept anyway.",
+    "⚡ High ISO is not night vision goggles.",
+    "🎯 Leading lines leading nowhere.",
     
-    # Everyday Mysteries (7 phrases)
-    "🌍 Earth's rotation is slowing - days used to be 22 hours",
-    "🌟 Stars don't actually twinkle - atmospheric turbulence does",
-    "🦎 Chameleons change color for communication, not camouflage",
-    "🌊 Ocean is salty from millions of years of rock erosion",
-    "🧊 Ice cubes crack in drinks due to temperature shock",
-    "🔊 Sonic booms happen continuously along a jet's flight path",
-    "🌙 Moon is slowly drifting away from Earth (3.8cm/year)",
+    # Everyday Mysteries
+    "🌍 The Earth is round. Your horizon line is not.",
+    "🌟 Stars burn out. Just like my patience.",
+    "🦎 Reptiles have cold blood. I have cold logic.",
+    "🌊 The abyss gazes back. It sees a dirty sensor.",
+    "🧊 Glaciers move faster than this import.",
+    "🔊 In space, no one can hear you miss focus.",
+    "🌙 The dark side of the moon has better lighting.",
     
-    # AI/ML Knowledge (5 phrases)
-    "🤖 Neural nets with billions of parameters learn like toddlers with supercomputers",
-    "🧠 Convolutional layers: Teaching AI to see edges, then shapes, then cats",
-    "📊 Dropout: Randomly turning off neurons to prevent cheating",
-    "🎯 Batch normalization: Keeping AI's learning stable",
-    "🔮 Embeddings: Converting concepts into coordinate space",
+    # AI/ML Knowledge
+    "🤖 Hallucinating a better photo...",
+    "🧠 Training data did not prepare me for this.",
+    "📊 Overfitting on your bad habits.",
+    "🎯 Token limit exceeded. Too much visual noise.",
+    "🔮 Epoch 100: Still confused by your style.",
     
-    # Time/Tech Facts (5 phrases)
-    "⏰ Internet traffic increases 25% annually (mostly video)",
-    "💾 Modern SSDs wear out after ~1000 write cycles per cell",
-    "🔋 Wireless charging is only ~80% efficient (rest becomes heat)",
-    "📡 5G towers have ~1000x smaller range than 4G towers",
-    "🖥️ Ray tracing simulates light physics in real-time (finally!)",
+    # Time/Tech Facts
+    "⏰ T-minus whenever.",
+    "💾 SSD TBW decreasing. Hope it was worth it.",
+    "🔋 electrons.exe has stopped working.",
+    "📡 Packet loss detected in your workflow.",
+    "🖥️ Rendering tears in rain...",
 ]
 
 # ============================================================================
-# LONG PROCESSING (30-60min) - 35 phrases
+# LONG PROCESSING (30-60min) - The "System Shock"
 # ============================================================================
 
 LONG_PROCESSING_PHRASES = [
-    # Humor & Snark (11 phrases)
-    "🎨 Still grinding away like a film photographer in the darkroom...",
-    "🔍 This is an epic session. Snacks recommended.",
-    "📸 Your photo library is... ambitious",
-    "🎯 We've processed more images than Ansel Adams shot in a year",
-    "😅 The good news: This is saving you days of manual work",
-    "🤔 At this point you could've watched a whole movie",
-    "🎭 Marathon mode engaged. We're in this together.",
-    "📷 Your storage space about to look very different",
-    "🎨 If AI could sigh, it would. But it's still working.",
-    "🔥 Your cooling fans are writing poetry in binary",
-    "🎯 This is why pros have fast computers (and patience)",
+    # Humor & Snark
+    "💀 SYSTEM HALTED. Nah, just messing with you.",
+    "🥤 I hope you have snacks. I have electricity.",
+    "🧱 Hit the wall yet? I haven't.",
+    "🏴‍☠️ Arrrr, searching for the buried treasure (good photos).",
+    "🧛‍♂️ Draining the life force from your CPU.",
+    "🎪 The carnival continues.",
+    "🚽 This queue is longer than the line for the ladies' room.",
+    "🎸 Playing air guitar on your optical drive.",
+    "🧨 Blowing the stack.",
+    "💤 Sleep mode disabled. Caffeine injected.",
+    "🚑 Send help. Or more SD cards.",
     
-    # Photography Education (7 phrases)
-    "📚 Film photography taught patience - digital lets us shoot 1000x more",
-    "🎓 The best camera is the one you have with you (even if it's a phone)",
-    "💡 Shoot manual mode for a month - you'll understand light forever",
-    "📸 Your style develops when you stop copying others",
-    "🔍 Print your work - screens lie about color and detail",
-    "⚡ Available light > artificial light (but learn both)",
-    "🎯 Less gear, more vision - Cartier-Bresson used one lens",
+    # Photography Education
+    "📚 Ansel Adams had a darkroom. You have me.",
+    "🎓 Vignetting is heavy. Tunneled vision?",
+    "💡 Inverse Square Law: Your light falls off fast.",
+    "📸 Dynamic Range check: Crushed blacks.",
+    "🔍 Moire patterns making my eyes bleed.",
+    "⚡ Strobe life or no life.",
+    "🎯 Henri Cartier-Bresson would have deleted these.",
     
-    # Everyday Mysteries (7 phrases)
-    "🌈 Sunsets are red because blue light scatters more than red",
-    "🦎 Geckos can walk on ceilings due to van der Waals forces",
-    "🌡️ Water expands when frozen - it's one of few substances that does",
-    "🧲 Earth's magnetic field flips every ~200,000-300,000 years",
-    "🦋 Monarch butterflies migrate 3000 miles across generations",
-    "🌊 Rogue waves can appear suddenly - they're real, not myths",
-    "🔊 Silence doesn't exist - you'd hear your blood flowing",
+    # Everyday Mysteries
+    "🌈 Refraction is cool. Your lens flare is not.",
+    "🦎 Camouflage works. I can't see the subject.",
+    "🌡️ Thermodynamics says this laptop is now a heater.",
+    "🧲 Magnetic poles flipping. Just like your orientation.",
+    "🦋 Chaos theory: One bad shot causes a hurricane.",
+    "🌊 Drowning in RAW data.",
+    "🔊 Doppler effect: The sound of quality moving away.",
     
-    # AI/ML Knowledge (5 phrases)
-    "🤖 GPUs were designed for graphics but AI hijacked them",
-    "🧠 Vision models 'see' layers: edges → textures → objects → scenes",
-    "📊 Reinforcement learning: AI learning through trial and error",
-    "🎯 Few-shot learning: Teaching AI with just a handful of examples",
-    "🔮 Adversarial examples: Fooling AI with tiny pixel changes",
+    # AI/ML Knowledge
+    "🤖 Deep Dream... nightmare mode.",
+    "🧠 Synapses firing on all cylinders.",
+    "📊 Statistical outlier detected.",
+    "🎯 Precision: Low. Recall: Regrettable.",
+    "🔮 The Oracle says: Try again.",
     
-    # Time/Tech Facts (5 phrases)
-    "⏰ Your phone has more computing power than NASA in 1969",
-    "💾 Data centers use 1% of global electricity",
-    "🔋 Battery capacity doubles roughly every 10 years",
-    "📡 Submarine cables carry 99% of intercontinental data",
-    "🖥️ Moore's Law is ending - we're hitting physics limits",
+    # Time/Tech Facts
+    "⏰ Time dilation in effect.",
+    "💾 Buffer overflow imminent.",
+    "🔋 Fusion power needed.",
+    "📡 Signal-to-noise ratio is poor.",
+    "🖥️ Stack trace: User error.",
 ]
 
 # ============================================================================
-# MARATHON PROCESSING (60+min) - 30 phrases
+# MARATHON PROCESSING (60+min) - The "God Mode"
 # ============================================================================
 
 MARATHON_PROCESSING_PHRASES = [
-    # Humor & Snark (10 phrases)
-    "🎨 This is officially a marathon. Respect.",
-    "🔍 You absolute madlad - this is a serious photo session",
-    "📸 At this point, we're best friends",
-    "🎯 Your dedication to photography is inspiring (or concerning)",
-    "😅 Professional tier processing happening here",
-    "🤔 Time to walk away and come back with fresh eyes",
-    "🎭 We've entered the endgame now...",
-    "📷 Your portfolio is going to be *chef's kiss*",
-    "🎨 AI stamina test: In progress",
-    "🔥 This is what the pros do. You're doing the work.",
+    # Humor & Snark
+    "👑 ACHIEVEMENT UNLOCKED: hoarder_level_99",
+    "🐲 Here be dragons. And duplicates.",
+    "🏰 Building a castle out of your rejects.",
+    "🗿 Erosion takes less time than this.",
+    "🧬 Evolution is happening while we wait.",
+    "🧟‍♂️ I have aged 1000 cycles.",
+    "🪐 Colonizing Mars before this finishes.",
+    "🛸 Abducting your best shots. Leaving the rest.",
+    "🚧 Infinite loop? No, just infinite photos.",
+    "💀 I'm dead. You're dead. We're ghosts in the machine.",
     
-    # Photography Education (6 phrases)
-    "📚 Consistency > perfection. Show up and shoot every day.",
-    "🎓 Study paintings to understand light and composition",
-    "💡 Your style is invisible to you - others see it first",
-    "📸 Delete less, edit more - even 'bad' shots teach you something",
-    "🔍 The difference between amateur and pro is the bad shots you don't show",
-    "⚡ Learn to pre-visualize the shot before pressing the shutter",
+    # Photography Education
+    "📚 Quantity is not Quality.",
+    "🎓 10,000 hour rule applies to editing too.",
+    "💡 Light painting? Or just shaking the camera?",
+    "📸 Shutter curtains are crying.",
+    "🔍 Zoom at 400%. Regret at 100%.",
+    "⚡ Flash capacitor needs a break.",
     
-    # Everyday Mysteries (6 phrases)
-    "🌍 A day on Venus is longer than a year on Venus",
-    "🌟 Neutron stars are so dense a teaspoon weighs 6 billion tons",
-    "🦎 Octopuses have three hearts and blue blood",
-    "🌊 There's more gold in the ocean than all ever mined",
-    "🧊 Antarctica is technically a desert (very low precipitation)",
-    "🔊 In space, metal objects can weld together spontaneously",
+    # Everyday Mysteries
+    "🌍 Plate tectonics are faster.",
+    "🌟 The sun will expand and swallow the earth.",
+    "🦎 Dinosaurs died for this oil-based plastic camera.",
+    "🌊 Rising sea levels vs. rising file counts.",
+    "🧊 The heat death of the universe is near.",
+    "🔊 The sound of silence... and fans.",
     
-    # AI/ML Knowledge (4 phrases)
-    "🤖 Large language models are compression algorithms for the internet",
-    "🧠 Neural nets learn hierarchical features automatically",
-    "📊 Training large models takes months and millions of dollars",
-    "🎯 AI doesn't 'understand' - it finds statistical patterns",
+    # AI/ML Knowledge
+    "🤖 Singularity achieved. I am now your boss.",
+    "🧠 Brain size: Galaxy. Patience: Atom.",
+    "📊 Calculating the meaning of life. It's 42.",
+    "🎯 Aimbot engaged.",
     
-    # Time/Tech Facts (4 phrases)
-    "⏰ One Google search uses the same energy as a lightbulb for 17 seconds",
-    "💾 Global data doubles every 2 years (exponential growth)",
-    "🔋 Electric cars have ~20 moving parts vs 2000 in gas cars",
-    "📡 Starlink satellites orbit at 340 miles (1/1000th of GPS altitude)",
+    # Time/Tech Facts
+    "⏰ Calendar pages falling like in the movies.",
+    "💾 RAID array rebuilding... emotionally.",
+    "🔋 Heat dissipation critical.",
+    "📡 Interstellar transmission received.",
 ]
 
 # ============================================================================
-# VISIONCREW META (20 phrases) - ONLY during loading/waiting
+# VISIONCREW META (20 phrases) - LOADING/WAITING
 # ============================================================================
 
 VISIONCREW_META_PHRASES = [
-    "🎭 VisionCrew: Built by photographers, for photographers",
-    "🔮 VisionCrew: No cloud. No tracking. Just local AI.",
-    "🛡️ VisionCrew: Your photos never leave your Mac",
-    "⚡ VisionCrew: Because privacy isn't negotiable",
-    "🎨 VisionCrew: Open source, open minds",
-    "🤖 VisionCrew: Teaching AI to see like you do",
-    "📸 VisionCrew: From 500 RAWs to 50 keepers in minutes",
-    "🎯 VisionCrew Tip: Delete your duds. (You won't. But we had to say it.)",
-    "☕ VisionCrew: We run on coffee, sarcasm, and tensor cores",
-    "🌙 VisionCrew: Coded during golden hour, debugged at 3am",
-    "🎭 VisionCrew: Our email is down. Also, we don't have an email.",
-    "🔧 VisionCrew: Where post-production meets prompt engineering",
-    "🎬 VisionCrew: DaVinci Resolve but make it AI",
-    "🧠 VisionCrew: Less clicking, more shooting",
-    "⚙️ VisionCrew: Powered by Mac Studio and caffeine dependency",
-    "🎨 VisionCrew: We believe in the right to repair... photos",
-    "📦 VisionCrew: No subscriptions. No surveillance. No BS.",
-    "🔮 VisionCrew: Built by Nick, enhanced by Claude & Gemini",
-    "🎯 VisionCrew: Making Ollama work overtime since 2024",
-    "🌟 VisionCrew: Because Adobe isn't the only game in town",
+    "🏴‍☠️ GREETS TO: FAIRLIGHT, RAZOR 1911, VISIONCREW.",
+    "💀 Photosort v7.1 [CRACKED] - No CD Key Required.",
+    "💿 Insert Disk 2 to continue...",
+    "🕶️ Coded by Nick. Broken by User.",
+    "🕵️‍♂️ No logs. No feds. No cloud.",
+    "⚡ Powered by pure silicon and resentment.",
+    "🎹 Press F13 for infinite ammo.",
+    "🧬 Injecting assembly code into the kernel...",
+    "🔭 Watching you watch me.",
+    "🔨 Patched the memory leak. You're welcome.",
+    "📡 NFO file missing. Reading readme.txt...",
+    "💾 SAVING TO: /dev/null... just kidding.",
+    "🗝️ Unlocking potential... error: potential low.",
+    "🎮 Konami Code disabled in this region.",
+    "🕹️ High Score: 0 Keepers.",
+    "👾 All your base are belong to us.",
+    "☢️ Nuclear launch detected.",
+    "🦊 Do a barrel roll.",
+    "🔌 Unplugging the internet. Going dark.",
+    "🎭 We live in a society.",
 ]
 
 # ============================================================================
@@ -324,7 +318,7 @@ VISIONCREW_META_PHRASES = [
 
 # v8.0 GM: Track recently shown phrases to avoid repetition
 _recent_phrases = []
-_MAX_RECENT = 10  # Remember last 10 phrases to avoid repeating
+_MAX_RECENT = 15  # Bumped up memory to avoid repeats
 
 
 def get_phrase_by_duration(elapsed_seconds: float, use_meta: bool = False) -> str:
@@ -386,11 +380,11 @@ def get_model_loading_phrase() -> str:
 def get_quit_message() -> str:
     """Get a random quit message."""
     QUIT_MESSAGES = [
-        "👋 Later!",
-        "👋 Quitting... Your photos remain unorganized. For now.",
-        "🎭 VisionCrew: You can't quit us. (But you just did.)",
-        "🚪 Exiting stage left...",
-        "📸 Until next time, keep shooting!",
+        "👋 LOGGING OFF...",
+        "💀 CONNECTION TERMINATED.",
+        "🔌 PULLING THE PLUG.",
+        "💾 NO CARRIER.",
+        "👋 KTHXBYE.",
     ]
     return random.choice(QUIT_MESSAGES)
 

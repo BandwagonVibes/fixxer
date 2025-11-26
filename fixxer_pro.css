@@ -13,9 +13,12 @@
 
 $background: #000000;
 $surface: #111111;
-$primary: #FFFFFF;    /* Stark White for Borders/Focus */
-$text: #888888;       /* Muted text for low eye strain */
-$redline: #FF3333;    /* The "Redline" Accent */
+$primary: #FFFFFF;
+/* Stark White for Borders/Focus */
+$text: #888888;
+/* Muted text for low eye strain */
+$redline: #FF3333;
+/* The "Redline" Accent */
 
 Screen {
     background: $background;
@@ -24,36 +27,86 @@ Screen {
 }
 
 /* ==============================================================================
- * Header & Branding
+ * Header & Branding - COMPACT LAYOUT
  * ============================================================================== */
 
 #header-row {
     height: auto;
     width: 100%;
+    layout: horizontal;
     align: left middle;
     border-bottom: solid $surface;
-    padding-bottom: 1;
-    margin-bottom: 1;
+    padding: 1 2;
+    margin-bottom: 0;
 }
 
 #logo {
-    width: 1fr;
+    width: 35%;
+    /* Match left-panel width so Easy+HUD aligns with Status & Logs */
     height: auto;
     text-align: left;
     color: $primary;
     text-style: bold;
-    padding: 1 2;
+    padding: 0;
+    margin: 0;
 }
 
-/* "Easy Archive" button */
+/* "Easy" button - vertically centered with HUD */
+#btn-easy {
+    width: 10;
+    height: 3;
+    min-height: 3;
+    max-height: 3;
+    margin: 0 2 0 0;
+    padding: 0;
+    background: $surface;
+    color: $primary;
+    border: solid $surface;
+    text-style: bold;
+    text-align: center;
+}
+
+#btn-easy:hover {
+    background: $redline;
+    color: $primary;
+    border: solid $redline;
+}
+
 .easy-btn {
+    width: 10;
+    height: 3;
+    min-height: 3;
+    max-height: 3;
+    margin: 0 2 0 0;
+    padding: 0;
+    background: $surface;
+    color: $primary;
+    border: solid $surface;
+    text-style: bold;
+    text-align: center;
+}
+
+/* HUD in header - right after Easy button */
+#milestone-hud {
     width: auto;
     height: auto;
-    min-width: 16;
-    margin: 1 2 1 0;
-    background: $background;
-    color: $text;
-    border: solid $surface;
+    align: left middle;
+    padding: 0;
+    margin: 0;
+}
+
+#hud-layout {
+    height: auto;
+    width: auto;
+    layout: horizontal;
+    align: left middle;
+}
+
+#btn-easy:hover,
+.easy-btn:hover {
+    background: $redline;
+    color: $primary;
+    border: solid $redline;
 }
 
 .easy-btn:hover {
@@ -63,27 +116,33 @@ Screen {
 }
 
 /* ==============================================================================
- * Layout Panels
+ * Layout Panels - Maximized vertical space
  * ============================================================================== */
+
+#main-layout {
+    height: 1fr;
+    width: 100%;
+}
 
 .panel-title {
     height: auto;
-    padding-bottom: 1;
+    padding: 0 1;
     color: $primary;
     text-style: bold;
     background: $surface;
-    padding: 0 1;
     margin-bottom: 1;
 }
 
 #left-panel {
     padding-right: 1;
-    width: 35%;  /* Narrower for portrait orientation */
+    width: 35%;
+    /* Narrower for portrait orientation */
 }
 
 #right-panel {
     padding-left: 1;
-    width: 65%;  /* Wider for landscape orientation */
+    width: 65%;
+    /* Wider for landscape orientation */
 }
 
 /* ==============================================================================
@@ -136,7 +195,8 @@ DirectoryTree {
     background: $surface !important;
     color: $primary !important;
     text-style: bold;
-    border-left: solid $redline;  /* The Redline touch */
+    border-left: solid $redline;
+    /* The Redline touch */
 }
 
 /* ==============================================================================
@@ -152,55 +212,53 @@ DirectoryTree {
     color: $primary;
 }
 
-/* SYSTEM MONITOR - The Redline Feature */
-#system-monitor {
-    height: auto;
-    margin-bottom: 1;
-    padding: 1 2;
-    align: center middle;
-    background: $background;
-    border: solid $surface;
-}
-
-#sysmon-row-1,
-#sysmon-row-2 {
-    height: auto;
+/* System Monitor Styles (used by RAM/CPU monitor widgets in footer) */
+.sysmon-row {
+    height: 100%;
+    /* Fill parent height for proper centering */
     width: 100%;
     align: left middle;
+    /* Align children to left, centered vertically */
     padding: 0;
 }
 
 .sysmon-label {
-    width: 6;
+    width: 4;
+    height: auto;
     color: $text;
     text-style: bold;
+    text-align: left;
+    content-align: left middle;
 }
 
 .sysmon-sparkline {
     width: 1fr;
-    height: 3;
+    height: 1;
+    /* Reduced height - sparklines only need 1 row */
     margin: 0 1;
 }
 
 .sysmon-value {
-    width: 5;
+    width: 4;
+    height: auto;
     text-align: right;
     color: $primary;
     text-style: bold;
+    content-align: right middle;
 }
 
-#sysmon-error {
+.sysmon-error {
     color: $surface;
     text-align: center;
 }
 
-/* The Sparklines - THIS IS THE REDLINE */
+/* The Sparklines - White for normal, Red handled in Python for critical */
 #ram-sparkline {
-    color: $redline !important;  /* Force red override */
+    color: $primary !important;
 }
 
 #cpu-sparkline {
-    color: $redline !important;  /* Force red override */
+    color: $primary !important;
 }
 
 /* ==============================================================================
@@ -209,8 +267,8 @@ DirectoryTree {
 
 #log-panel {
     height: 1fr;
-    min-height: 15;
-    max-height: 1fr;
+    min-height: 10;
+    /* Reduced min since we have more space now */
 }
 
 #log-container {
@@ -221,7 +279,7 @@ DirectoryTree {
     color: $text;
 }
 
-/* Spinner Area */
+/* Spinner Area - Compact when idle */
 #progress-container {
     height: auto;
     width: 100%;
@@ -229,10 +287,16 @@ DirectoryTree {
     background: $surface;
     margin-bottom: 1;
     border: solid $surface;
-    border-left: solid $redline;  /* Active status indicator */
+    border-left: solid $redline;
+    /* Active status indicator */
 }
 
-#progress-container Horizontal {
+#progress-container.idle {
+    /* Compact state when not running */
+    padding: 0 1;
+}
+
+#progress-inner {
     height: auto;
     width: 100%;
 }
@@ -247,9 +311,15 @@ DirectoryTree {
 
 #progress-phrase {
     height: auto;
-    padding-top: 0;
-    color: $primary;
+    padding: 0;
+    color: $text;
+    /* Muted when idle */
     width: 1fr;
+}
+
+#progress-phrase.active {
+    color: $primary;
+    /* Bright when running */
 }
 
 #progress-timer {
@@ -257,34 +327,99 @@ DirectoryTree {
     color: $text;
     text-align: right;
     width: auto;
+    padding: 0;
 }
 
 /* ==============================================================================
- * Buttons (Tactical Controls)
+ * Footer Button Bar (HUD Layout)
  * ============================================================================== */
 
 #button-bar {
     height: auto;
     width: 100%;
+    layout: horizontal;
     align: center middle;
-    padding: 1 0;
+    padding: 0;
+    /* Removed all padding */
+    background: $background;
+    border: none;
+}
+
+/* RAM Monitor (Left Bookend) */
+#ram-monitor {
+    width: 40;
+    height: auto;
+    /* Auto height to match button bar */
+    min-height: 3;
+    border-right: solid $surface;
+    padding: 0 2;
+    align: center middle;
+    content-align: center middle;
+}
+
+/* CPU Monitor (Right Bookend) */
+#cpu-monitor {
+    width: 40;
+    height: auto;
+    /* Auto height to match button bar */
+    min-height: 3;
+    border-left: solid $surface;
+    padding: 0 2;
+    align: center middle;
+    content-align: center middle;
+}
+
+/* Center Controls Container */
+#controls-container {
+    width: 1fr;
+    height: auto;
+    layout: horizontal;
+    align: center middle;
+    padding: 0 3;
+    /* Increased from 2 for better separation from monitors */
+}
+
+.btn-group {
+    height: auto;
+    width: auto;
+    align: center middle;
+    margin: 0 2;
 }
 
 .workflow-btn,
 .path-btn {
     margin: 0 1;
-    width: 1fr;
+    width: auto;
+    min-width: 10;
+    padding: 0 0 0 0;
     background: $surface;
-    color: $text;
+    color: #ffffff;
+    text-style: bold;
+    text-align: center;
+    content-align: center middle;
     border: solid $surface;
 }
 
 .workflow-btn:hover,
-.path-btn:hover {
+.path-btn:hover,
+.control-btn:hover {
     background: $primary;
     color: $background;
     text-style: bold;
     border: solid $primary;
+}
+
+.control-btn {
+    margin: 0 1;
+    width: auto;
+    min-width: 14;
+    height: 3;
+    padding: 0 0 0 0;
+    background: $surface;
+    color: #ffffff;
+    border: solid $surface;
+    text-align: center;
+    content-align: center middle;
 }
 
 /* "QUIT" Button - The Emergency Stop */
@@ -300,6 +435,27 @@ DirectoryTree {
     color: $primary;
     border: solid $redline;
 }
+
+/* "STOP" Button - The Emergency Brake */
+#btn-stop {
+    background: $surface;
+    color: $redline;
+    text-style: bold;
+    border: solid $surface;
+}
+
+#btn-stop:hover {
+    background: $redline;
+    color: $primary;
+    border: solid $redline;
+}
+
+#btn-stop:disabled {
+    background: $background;
+    color: $surface;
+    border: solid $surface;
+}
+
 /* ==============================================================================
  * FIXXER PRO MODE - MILESTONE HUD CSS
  * "TACTICAL DASHBOARD EXTENSION"
@@ -314,35 +470,35 @@ DirectoryTree {
  * MILESTONE HUD (Heads Up Display)
  * ============================================================================== */
 
-#milestone-hud {
-    height: auto;
-    width: 100%;             /* Fill the panel width */
-    align: center middle;    /* Center the widget group */
-    padding: 0 1;            /* Small padding on sides */
-    margin-bottom: 1;        /* Space before System Monitor */
-}
+/* Note: #milestone-hud and #hud-layout are defined in header section above */
 
-#hud-layout {
-    height: auto;
-    width: auto;
-    align: center middle;    /* Center the group of boxes */
-}
-
-/* === STAT BOX CONTAINERS === */
+/* === STAT BOX CONTAINERS - Compact for header === */
 .hud-box {
-    width: 13;               /* Compact width for tight layout */
+    width: auto;
+    min-width: 11;
+    /* Slightly wider to prevent text wrapping */
     height: auto;
-    min-height: 4;           /* Just enough for label + value */
-    margin-left: 1;          /* Spacing between boxes */
-    background: $background; /* Pure black #000000 */
-    border: solid $surface;  /* Subtle border (#111111) - barely visible */
+    min-height: 3;
+    /* Reduced height for header */
+    margin: 0 1;
+    /* Spacing between boxes */
+    background: $background;
+    /* Pure black #000000 */
+    border: solid $surface;
+    /* Subtle border (#111111) - barely visible */
     align: center middle;
     padding: 0 1;
 }
 
+/* Archived box needs extra width for the longer label */
+#hud-archived {
+    min-width: 12;
+}
+
 /* Subtle hover effect - barely visible border highlight */
 .hud-box:hover {
-    border: solid #1a1a1a;   /* Slightly lighter than surface */
+    border: solid #1a1a1a;
+    /* Slightly lighter than surface */
 }
 
 /* === LABELS (Top text in each box) === */
@@ -350,7 +506,8 @@ DirectoryTree {
     width: 100%;
     height: auto;
     text-align: center;
-    color: $text;            /* Muted grey #888888 */
+    color: $text;
+    /* Muted grey #888888 */
     text-style: bold;
     padding-bottom: 0;
     padding-top: 0;
@@ -361,7 +518,8 @@ DirectoryTree {
     width: 100%;
     height: auto;
     text-align: center;
-    color: $primary;         /* White #FFFFFF */
+    color: $primary;
+    /* White #FFFFFF */
     text-style: bold;
     padding-top: 0;
 }
@@ -377,32 +535,39 @@ DirectoryTree {
 /* Color-coded tier values */
 .hud-val-a {
     width: auto;
-    min-width: 3;            /* Minimum width for alignment */
+    min-width: 3;
+    /* Minimum width for alignment */
     text-align: center;
-    color: $primary;         /* White - best quality */
+    color: $primary;
+    /* White - best quality */
     text-style: bold;
 }
 
 .hud-val-b {
     width: auto;
-    min-width: 3;            /* Minimum width for alignment */
+    min-width: 3;
+    /* Minimum width for alignment */
     text-align: center;
-    color: $text;            /* Grey - medium quality */
+    color: $text;
+    /* Grey - medium quality */
     text-style: bold;
 }
 
 .hud-val-c {
     width: auto;
-    min-width: 3;            /* Minimum width for alignment */
+    min-width: 3;
+    /* Minimum width for alignment */
     text-align: center;
-    color: $redline;         /* Red #FF3333 - needs attention */
+    color: $redline;
+    /* Red #FF3333 - needs attention */
     text-style: bold;
 }
 
 /* Separator slashes between tier values */
 .hud-sep {
     width: auto;
-    color: $surface;         /* Nearly invisible #111111 */
+    color: $surface;
+    /* Nearly invisible #111111 */
     padding: 0;
     margin: 0 1;
 }
@@ -416,7 +581,8 @@ DirectoryTree {
 
 /* Tiers box - wider to fit A/B/C layout */
 #hud-tiers {
-    width: 20;               /* Wider for proper alignment of letters and numbers */
+    min-width: 14;
+    /* Wider for proper alignment of letters and numbers */
 }
 
 /* Heroes box - no special styling needed */

@@ -7,7 +7,7 @@ FIXXER ✞ TUI (v1.0) - Professional-Grade Edition
 - NEW (v1.0): FIXXER ✞ branding - "CHAOS PATCHED // LOGIC INJECTED"
 - CORE: BRISQUE and CLIP engine verification checks
 - UI: Animated block spinner with rotating motivational phrases
-- STYLE: External CSS theming via photosort_visioncrew.css
+- STYLE: External CSS theming via fixxer_warez.css
 - AESTHETIC: Warez-inspired red/white/black color scheme
 """
 
@@ -53,7 +53,7 @@ except ImportError:
 
 # Import the engine functions
 try:
-    from photosort_engine import (
+    from fixxer_engine import (
         auto_workflow,
         simple_sort_workflow,  # NEW: Simple legacy mode workflow
         group_bursts_in_directory,
@@ -62,6 +62,7 @@ try:
         load_app_config,
         save_app_config,  # NEW: Save config changes
         check_rawpy,  # v10.0: Python-native RAW support (replaces check_dcraw)
+        check_ollama_connection,  # v1.0.0: Llama connection check with dad joke
         SUPPORTED_EXTENSIONS  # Import to check what's supported
     )
     ENGINE_AVAILABLE = True
@@ -79,35 +80,39 @@ except ImportError as e:
             'default_model': 'qwen2.5vl:3b'
         }
     
-    def auto_workflow(log_callback, app_config):
+    def auto_workflow(log_callback, app_config, tracker=None, stop_event=None):
         log_callback(f"🚀 [Test Mode] Engine import failed: {ENGINE_IMPORT_ERROR}")
         import time
         time.sleep(1)
         return {}
     
-    def simple_sort_workflow(log_callback, app_config):
+    def simple_sort_workflow(log_callback, app_config, stop_event=None):
         log_callback(f"🚀 [Test Mode] Engine import failed: {ENGINE_IMPORT_ERROR}")
         import time
         time.sleep(1)
         return {}
     
-    def group_bursts_in_directory(log_callback, app_config, simulated=False):
+    def group_bursts_in_directory(log_callback, app_config, simulated=False, tracker=None, directory_override=None, stop_event=None):
         log_callback(f"🚀 [Test Mode] Engine import failed: {ENGINE_IMPORT_ERROR}")
         import time
         time.sleep(1)
     
-    def cull_images_in_directory(log_callback, app_config, simulated=False):
+    def cull_images_in_directory(log_callback, app_config, simulated=False, tracker=None, directory_override=None, stop_event=None):
         log_callback(f"🚀 [Test Mode] Engine import failed: {ENGINE_IMPORT_ERROR}")
         import time
         time.sleep(1)
     
-    def show_exif_insights(log_callback, app_config, simulated=False):
+    def show_exif_insights(log_callback, app_config, simulated=False, directory_override=None, stop_event=None):
         log_callback(f"🚀 [Test Mode] Engine import failed: {ENGINE_IMPORT_ERROR}")
         import time
         time.sleep(1)
     
     def check_rawpy(log_callback):
         log_callback("🚀 [Test Mode] rawpy check skipped.")
+    
+    def check_ollama_connection(log_callback, all_systems_go=True):
+        log_callback("🚀 [Test Mode] Ollama check skipped.")
+        return False
     
     def save_app_config(config):
         return False  # Can't save in test mode
@@ -166,21 +171,27 @@ class ModelSelectScreen(ModalScreen[Optional[str]]):
     CSS = """
     ModelSelectScreen {
         align: center middle;
+        background: rgba(0, 0, 0, 0.85);
     }
     
     #model-dialog {
         width: 60%;
         height: 60%;
-        border: thick $primary;
-        background: $surface;
+        border: solid #333333;
+        background: #000000;
         padding: 1;
+    }
+    
+    #model-title {
+        padding: 1;
+        text-style: bold;
     }
     
     #model-list {
         height: 1fr;
-        border: solid $primary 50%;
+        border: solid #222222;
         margin: 1 0;
-        background: $surface;
+        background: #0a0a0a;
         padding: 1;
     }
     
@@ -188,8 +199,8 @@ class ModelSelectScreen(ModalScreen[Optional[str]]):
         height: 3;
         margin-bottom: 1;
         padding: 1;
-        background: $surface;
-        border: solid $primary 20%;
+        background: #111111;
+        border: solid #222222;
     }
     
     #model-button-row {
@@ -200,6 +211,11 @@ class ModelSelectScreen(ModalScreen[Optional[str]]):
     
     #model-button-row Button {
         margin: 0 2;
+    }
+    
+    .model-option {
+        margin: 0 0 1 0;
+        width: 100%;
     }
     """
     
@@ -254,14 +270,16 @@ class DirectorySelectScreen(ModalScreen[Optional[Path]]):
     #dialog {
         width: 80%;
         height: 80%;
-        border: thick $primary;
-        background: $surface; /* Use var from main CSS */
+        border: solid $surface;
+        /* Changed from thick $primary to solid $surface - thinner and darker */
+        background: $surface;
         padding: 1;
     }
     
     #tree-container {
         height: 1fr;
-        border: solid $primary 50%;
+        border: solid $surface;
+        /* Changed from solid $primary 50% to solid $surface */
         margin: 1 0;
         background: $surface;
     }
@@ -296,8 +314,8 @@ class DirectorySelectScreen(ModalScreen[Optional[Path]]):
             yield Label(f"[bold]{self.title_text}[/bold]", id="dialog-title")
             yield Static(f"Current: {self.start_path}", id="path-display")
             with ScrollableContainer(id="tree-container"):
-                # Always start at Home for full context
-                yield DirectoryTree(str(Path.home()), id="dir-tree")
+                # Use FilteredDirectoryTree to hide dotfiles
+                yield FilteredDirectoryTree(str(Path.home()), id="dir-tree")
             with Horizontal(id="button-row"):
                 yield Button("Select", variant="primary", id="btn-select")
                 yield Button("Cancel", variant="default", id="btn-cancel")
@@ -352,91 +370,101 @@ class DirectorySelectScreen(ModalScreen[Optional[Path]]):
 # Widget Components
 # ==============================================================================
 
-class SystemMonitor(Container):
-    """Real-time system resource monitor with sparkline graphs - RAM & CPU only."""
+class RAMMonitor(Container):
+    """Real-time RAM monitor with sparkline graph."""
     
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self.ram_data = [0.0] * 50  # 50 points for sparkline (100 seconds of history)
-        self.cpu_data = [0.0] * 50
+        self.ram_data = [0.0] * 20  # Reduced points for footer
         self.update_timer: Optional[Timer] = None
     
     def compose(self) -> ComposeResult:
         if not PSUTIL_AVAILABLE:
-            yield Static("[dim]System monitoring unavailable (psutil not installed)[/dim]", id="sysmon-error")
+            yield Static("RAM: N/A", classes="sysmon-error")
             return
         
-        with Horizontal(id="sysmon-row-1"):
-            yield Static("RAM:", classes="sysmon-label")
+        with Horizontal(classes="sysmon-row"):
+            yield Static("RAM", classes="sysmon-label")
             yield Sparkline(self.ram_data, id="ram-sparkline", classes="sysmon-sparkline")
             yield Static("0%", id="ram-value", classes="sysmon-value")
-        
-        with Horizontal(id="sysmon-row-2"):
-            yield Static("CPU:", classes="sysmon-label")
-            yield Sparkline(self.cpu_data, id="cpu-sparkline", classes="sysmon-sparkline")
-            yield Static("0%", id="cpu-value", classes="sysmon-value")
     
     def on_mount(self) -> None:
-        """Start the monitoring timer when mounted."""
         if PSUTIL_AVAILABLE:
             self.update_timer = self.set_interval(2.0, self.update_stats)
-            # Force initial update after a brief delay
             self.set_timer(0.5, self.update_stats)
     
     def on_unmount(self) -> None:
-        """Stop the monitoring timer when unmounted."""
         if self.update_timer:
             self.update_timer.stop()
     
     def update_stats(self) -> None:
-        """Update system statistics and sparklines."""
         if not PSUTIL_AVAILABLE:
             return
-        
         try:
-            # Get CPU usage
-            cpu_percent = psutil.cpu_percent(interval=0.1)
-            
-            # Get RAM usage
             ram = psutil.virtual_memory()
             ram_percent = ram.percent
-            
-            # Update data arrays (FIFO)
-            self.cpu_data.append(cpu_percent)
-            self.cpu_data.pop(0)
             self.ram_data.append(ram_percent)
             self.ram_data.pop(0)
             
-            # Update RAM sparkline and value
             try:
-                ram_sparkline = self.query_one("#ram-sparkline", Sparkline)
-                # Create new list to ensure Textual detects the change
-                ram_sparkline.data = list(self.ram_data)
-                # Force refresh
-                ram_sparkline.refresh()
+                sparkline = self.query_one("#ram-sparkline", Sparkline)
+                sparkline.data = list(self.ram_data)
+                sparkline.refresh()
                 
-                ram_value = self.query_one("#ram-value", Static)
-                ram_color = "red" if ram_percent > 85 else "white"
-                ram_value.update(f"[{ram_color}]{ram_percent:.0f}%[/{ram_color}]")
+                value = self.query_one("#ram-value", Static)
+                color = "red" if ram_percent > 85 else "white"
+                value.update(f"[{color}]{ram_percent:.0f}%[/{color}]")
             except Exception:
                 pass
-            
-            # Update CPU sparkline and value
-            try:
-                cpu_sparkline = self.query_one("#cpu-sparkline", Sparkline)
-                # Create new list to ensure Textual detects the change
-                cpu_sparkline.data = list(self.cpu_data)
-                # Force refresh
-                cpu_sparkline.refresh()
-                
-                cpu_value = self.query_one("#cpu-value", Static)
-                cpu_color = "red" if cpu_percent > 80 else "white"
-                cpu_value.update(f"[{cpu_color}]{cpu_percent:.0f}%[/{cpu_color}]")
-            except Exception:
-                pass
-                
         except Exception:
-            # Silently fail - don't disrupt the app
+            pass
+
+class CPUMonitor(Container):
+    """Real-time CPU monitor with sparkline graph."""
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.cpu_data = [0.0] * 20  # Reduced points for footer
+        self.update_timer: Optional[Timer] = None
+    
+    def compose(self) -> ComposeResult:
+        if not PSUTIL_AVAILABLE:
+            yield Static("CPU: N/A", classes="sysmon-error")
+            return
+        
+        with Horizontal(classes="sysmon-row"):
+            yield Static("CPU", classes="sysmon-label")
+            yield Sparkline(self.cpu_data, id="cpu-sparkline", classes="sysmon-sparkline")
+            yield Static("0%", id="cpu-value", classes="sysmon-value")
+    
+    def on_mount(self) -> None:
+        if PSUTIL_AVAILABLE:
+            self.update_timer = self.set_interval(2.0, self.update_stats)
+            self.set_timer(0.5, self.update_stats)
+    
+    def on_unmount(self) -> None:
+        if self.update_timer:
+            self.update_timer.stop()
+    
+    def update_stats(self) -> None:
+        if not PSUTIL_AVAILABLE:
+            return
+        try:
+            cpu_percent = psutil.cpu_percent(interval=None)
+            self.cpu_data.append(cpu_percent)
+            self.cpu_data.pop(0)
+            
+            try:
+                sparkline = self.query_one("#cpu-sparkline", Sparkline)
+                sparkline.data = list(self.cpu_data)
+                sparkline.refresh()
+                
+                value = self.query_one("#cpu-value", Static)
+                color = "red" if cpu_percent > 80 else "white"
+                value.update(f"[{color}]{cpu_percent:.0f}%[/{color}]")
+            except Exception:
+                pass
+        except Exception:
             pass
 
 
@@ -494,11 +522,13 @@ class FilteredDirectoryTree(DirectoryTree):
     """A DirectoryTree that filters out hidden files and directories."""
     
     def filter_paths(self, paths: list[Path]) -> list[Path]:
-        """Filter out hidden files/directories (starting with a dot)."""
+        """Filter out hidden files/directories and system roots."""
+        excluded_roots = {'/bin', '/sbin', '/usr', '/var', '/private', '/System', '/Library', '/dev', '/proc', '/sys', '/tmp', '/run', '/boot', '/etc', '/opt', '/net', '/home', '/Volumes', '/cores'}
         return [
             path
             for path in paths
-            if not path.name.startswith(".")
+            if not path.name.startswith(".") 
+            and str(path) not in excluded_roots
         ]
 
 
@@ -596,8 +626,8 @@ class MilestoneHUD(Container):
 # Main Application
 # ==============================================================================
 
-class PhotoSortTUI(App):
-    """The main TUI application for PhotoSort."""
+class FixxerTUI(App):
+    """The main TUI application for FIXXER."""
     
     # v10.0: CSS is now loaded dynamically based on pro_mode config
     # We'll load CSS content in __init__ instead of using CSS_PATH
@@ -611,8 +641,16 @@ class PhotoSortTUI(App):
         Binding("r", "refresh_config", "Refresh (r)", show=False),
         Binding("1", "set_source", "Source (1)", show=False),
         Binding("2", "set_dest", "Dest (2)", show=False),
+        Binding("m", "select_model", "Model (m)", show=False),
         Binding("f12", "toggle_pro_mode", "Pro Mode (F12)", show=False),
         Binding("ctrl+c", "quit", "Quit", show=False),
+        # Workflow Shortcuts
+        Binding("a", "run_auto", "Auto (a)", show=False),
+        Binding("b", "run_bursts", "Bursts (b)", show=False),
+        Binding("c", "run_cull", "Cull (c)", show=False),
+        Binding("s", "run_stats", "Stats (s)", show=False),
+        Binding("k", "run_critique", "Critique (k)", show=False),
+        Binding("escape", "stop", "Stop (Esc)", show=False),
     ]
     
     # Block spinner frames - square block animation
@@ -637,19 +675,20 @@ class PhotoSortTUI(App):
         pro_mode = temp_config.get('pro_mode', False)
         
         # Load appropriate CSS file
-        css_file = "photosort_pro.css" if pro_mode else "photosort_visioncrew.css"
+        css_file = "fixxer_pro.css" if pro_mode else "fixxer_warez.css"
         try:
             with open(css_file, 'r') as f:
-                PhotoSortTUI.CSS = f.read()
+                FixxerTUI.CSS = f.read()
         except FileNotFoundError:
             # Fallback to default if file not found
             print(f"Warning: Could not find {css_file}, using default styling")
-            PhotoSortTUI.CSS = ""
+            FixxerTUI.CSS = ""
         
         super().__init__(**kwargs)
         self.app_config = temp_config
         self.current_thread: Optional[threading.Thread] = None
         self.workflow_active = False
+        self.stop_event = threading.Event()
         
         self.status_lock = threading.Lock()
         self.current_status = "Ready"
@@ -668,21 +707,16 @@ class PhotoSortTUI(App):
         self.spinner_display: Optional[Static] = None
         self.progress_phrase: Optional[Static] = None
         self.progress_timer_display: Optional[Static] = None
+        self.progress_container: Optional[Container] = None  # For compact/expanded state
         self.milestone_hud: Optional[MilestoneHUD] = None  # HUD reference (Pro Mode only)
     
     def get_fixxer_logo(self) -> str:
         """UI: Returns the FIXXER logo - adapts to pro_mode."""
         
         if self.app_config.get('pro_mode', False):
-            # PRO MODE: Clean, minimal typography - LARGE
-            logo = """
-
-[bold white]F  I  X  X  E  R    / /    P  R  O[/bold white]
-
-[dim white]═══════════════════════════════════════════════════════════════════════════════[/dim white]
-
-[bold red]T A C T I C A L   P R E C I S I O N[/bold red]
-[dim white]INTEGRITY VERIFIED  |  HASH-SECURED OPERATIONS[/dim white]"""
+            # PRO MODE: Compact single-line header with F12 indicator
+            logo = """[bold white]F I X X E R  / /  P R O[/bold white]                                                      [dim white][ F12 ][/dim white]
+[#666666]V I S U A L[/#666666] [dim white]I N T E L L I G E N C E[/dim white]  [#666666]/ /[/#666666]  [dim white]L O C A L[/dim white] [#666666]C O M P U T E[/#666666]"""
         else:
             # STANDARD MODE: Warez Edition
             logo = """[bold white]███████ ██[/bold white]   [bold white]██   ██ ██   ██[/bold white]   [bold red]███████ ██████ [/bold red]     [bold red]██[/bold red]
@@ -702,10 +736,18 @@ class PhotoSortTUI(App):
     def compose(self) -> ComposeResult:
         # No Header
         # The app title is now part of the logo/header area
-        # NEW: Add horizontal container for logo + Easy Archive button
+        # Layout: [LOGO] [Easy Archive] [HUD boxes] - aligned left, not pushed right
         with Horizontal(id="header-row"):
+            # Left: Logo block
             yield Static(self.get_fixxer_logo(), id="logo")
-            yield Button("Easy Archive", id="btn-easy", variant="default", classes="easy-btn")
+            
+            # Easy Archive button - after logo
+            yield Button("Easy", id="btn-easy", classes="easy-btn")
+            
+            # HUD boxes (Pro Mode only) - right after Easy button
+            if self.app_config.get('pro_mode', False):
+                self.milestone_hud = MilestoneHUD(id="milestone-hud")
+                yield self.milestone_hud
         
         with Horizontal(id="main-layout"):
             with Vertical(id="left-panel"):
@@ -722,26 +764,25 @@ class PhotoSortTUI(App):
             with Vertical(id="right-panel"):
                 yield Static("[bold]Status & Logs[/bold]", classes="panel-title")
                 
-                # === MILESTONE HUD (Pro Mode Only) ===
-                # MOVED from Header to Panel
-                if self.app_config.get('pro_mode', False):
-                    self.milestone_hud = MilestoneHUD(id="milestone-hud")
-                    yield self.milestone_hud
+                # === MODE-SPECIFIC WIDGETS ===
+                if not self.app_config.get('pro_mode', False):
+                    # Standard Mode only: System Monitor with red sparklines in panel
+                    with Container(id="system-monitor"):
+                        yield RAMMonitor()
+                        yield CPUMonitor()
+                # Pro Mode: HUD is now in header, no system monitor here
                 # =====================================
-
-                # System Monitor - GPU, RAM, CPU sparklines
-                self.system_monitor = SystemMonitor(id="system-monitor")
-                yield self.system_monitor
                 
                 self.status_bar = Static(id="status-bar")
                 yield self.status_bar
                 
-                # Progress spinner with rotating phrases (replaces progress bar)
-                with Container(id="progress-container"):
+                # Progress indicator - compact when idle, expands when active
+                self.progress_container = Container(id="progress-container")
+                with self.progress_container:
                     self.spinner_display = Static("", id="spinner-display")
                     yield self.spinner_display
-                    with Horizontal():
-                        self.progress_phrase = Static("Ready to process", id="progress-phrase")
+                    with Horizontal(id="progress-inner"):
+                        self.progress_phrase = Static("Ready", id="progress-phrase")
                         yield self.progress_phrase
                         self.progress_timer_display = Static("", id="progress-timer")
                         yield self.progress_timer_display
@@ -750,28 +791,50 @@ class PhotoSortTUI(App):
                 yield self.log_panel
         
         with Horizontal(id="button-bar"):
-            # Updated button text (removed emojis)
-            yield Button("Auto", id="btn-auto", variant="primary", classes="workflow-btn")
-            yield Button("Bursts", id="btn-burst", variant="default", classes="workflow-btn")
-            yield Button("Cull", id="btn-cull", variant="default", classes="workflow-btn")
-            yield Button("Stats", id="btn-stats", variant="default", classes="workflow-btn")
-            yield Button("Critique", id="btn-critique", variant="default", classes="workflow-btn")
-            yield Button("Set Source (1)", id="btn-source", variant="warning", classes="path-btn")
-            yield Button("Dest (2)", id="btn-dest", variant="warning", classes="path-btn")
-            yield Button("Model", id="btn-model", variant="default", classes="path-btn")
-            # Updated Quit button text
-            yield Button("LOGOUT (q)", id="btn-quit", variant="error", classes="path-btn")
+            # Pro Mode Only: RAM monitor in footer (left bookend)
+            if self.app_config.get('pro_mode', False):
+                self.ram_monitor = RAMMonitor(id="ram-monitor")
+                yield self.ram_monitor
+
+            # Center Stage: Controls (always visible in both modes)
+            with Horizontal(id="controls-container"):
+                # Group 1: Setup
+                with Horizontal(classes="btn-group"):
+                    yield Button("[1] Source", id="btn-source", variant="warning", classes="path-btn", tooltip="Keyboard: 1")
+                    yield Button("[2] Dest", id="btn-dest", variant="warning", classes="path-btn", tooltip="Keyboard: 2")
+                    yield Button("[M] Model", id="btn-model", variant="default", classes="path-btn", tooltip="Keyboard: M")
+                
+                # Group 2: Tactical
+                with Horizontal(classes="btn-group"):
+                    yield Button("[A] Auto", id="btn-auto", variant="primary", classes="workflow-btn", tooltip="Keyboard: A")
+                    yield Button("[B] Bursts", id="btn-burst", variant="default", classes="workflow-btn", tooltip="Keyboard: B")
+                    yield Button("[C] Cull", id="btn-cull", variant="default", classes="workflow-btn", tooltip="Keyboard: C")
+                    yield Button("[S] Stats", id="btn-stats", variant="default", classes="workflow-btn", tooltip="Keyboard: S")
+                
+                # Group 3: System
+                with Horizontal(classes="btn-group"):
+                    yield Button("[K] Critique", id="btn-critique", variant="default", classes="workflow-btn", tooltip="Keyboard: K")
+                    yield Button("[Esc] STOP", id="btn-stop", variant="error", classes="control-btn", disabled=True)
+                    yield Button("[Q] Quit", id="btn-quit", variant="error", classes="control-btn")
+            
+            # Pro Mode Only: CPU monitor in footer (right bookend)
+            if self.app_config.get('pro_mode', False):
+                self.cpu_monitor = CPUMonitor(id="cpu-monitor")
+                yield self.cpu_monitor
         # No Footer
     
     def on_mount(self) -> None:
-        self.write_to_log("[bold red]VisionCrew PhotoSort v12.1[/bold red] - System Online")
+        self.write_to_log("[bold red]VisionCrew Fixxer v1.0.0[/bold red] - System Online")
         self.write_to_log("[dim]────────────────────────────────────────────[/dim]")
         
         if not ENGINE_AVAILABLE:
-            self.write_to_log(f"[bold red]✗ FATAL: photosort_engine.py not found.[/bold red]")
+            self.write_to_log(f"[bold red]✗ FATAL: fixxer_engine.py not found.[/bold red]")
             self.write_to_log(f"[dim]   Error: {ENGINE_IMPORT_ERROR}[/dim]")
             self.toggle_workflow_buttons(disabled=True, force=True)
             return
+        
+        # Track if all critical systems are ready (for FULL VISION status)
+        all_systems_ready = True
         
         # Log supported extensions for debugging
         if SUPPORTED_EXTENSIONS:
@@ -784,17 +847,28 @@ class PhotoSortTUI(App):
             check_rawpy(self.write_to_log)
         except Exception as e:
             self.write_to_log(f"[red]Error during rawpy check: {e}[/red]")
+            all_systems_ready = False
         
         # NEW: Check BRISQUE engine availability (using pre-checked flags)
         self._check_brisque_engine()
+        if BRISQUE_STATUS == "fallback":
+            all_systems_ready = False
         
         # NEW: Check CLIP engine availability (using pre-checked flags)
         self._check_clip_engine()
+        if CLIP_STATUS == "fallback":
+            all_systems_ready = False
 
         if self.app_config.get('config_file_found'):
             self.write_to_log(f"✓ Config loaded from ~/.photosort.conf")
         else:
             self.write_to_log("[yellow]No config file found, using defaults[/yellow]")
+        
+        # THE LLAMA CHECK (with system status) 🦙💨
+        ollama_ready = check_ollama_connection(self.write_to_log, all_systems_ready)
+        if not ollama_ready:
+            # Ollama down doesn't break the system, but note it
+            pass
         
         self._update_status_bar_display()
         
@@ -1084,6 +1158,54 @@ class PhotoSortTUI(App):
     def on_quit_button(self) -> None:
         self.action_quit()
 
+    @on(Button.Pressed, "#btn-stop")
+    def on_stop_button(self) -> None:
+        self.action_stop()
+
+    def action_stop(self) -> None:
+        """Emergency stop - terminate active workflow thread."""
+        if not self.workflow_active:
+            self.write_to_log("[yellow]No workflow running to stop[/yellow]")
+            return
+        
+        if self.current_thread and self.current_thread.is_alive():
+            self.write_to_log("🛑 [bold yellow]STOP requested by user...[/bold yellow]")
+            self.write_to_log("   [yellow]Warning: Thread termination is not instant[/yellow]")
+            self.write_to_log("   [yellow]Current operation will complete, then halt[/yellow]")
+            
+            # Signal thread to stop
+            self.workflow_active = False
+            self.stop_event.set()
+            
+            # Reset UI immediately
+            self.stop_progress_tracking()
+            self.toggle_workflow_buttons(disabled=False)
+            self.toggle_workflow_buttons(disabled=False)
+            self.update_status("Stopped by user", {})
+
+    # --- Keyboard Shortcut Actions ---
+    
+    def action_run_auto(self) -> None:
+        self.query_one("#btn-auto", Button).press()
+
+    def action_run_bursts(self) -> None:
+        self.query_one("#btn-burst", Button).press()
+
+    def action_run_cull(self) -> None:
+        self.query_one("#btn-cull", Button).press()
+
+    def action_run_stats(self) -> None:
+        self.query_one("#btn-stats", Button).press()
+
+    def action_run_critique(self) -> None:
+        self.query_one("#btn-critique", Button).press()
+
+    @on(DirectoryTree.NodeSelected)
+    def on_browser_node_selected(self, event: DirectoryTree.NodeSelected) -> None:
+        """Handle double-click on a file or directory."""
+        # Currently just a hook, can be expanded for specific double-click actions
+        pass
+
     def action_set_source(self) -> None:
         """Set source from the currently selected directory in the browser."""
         if not self.file_browser:
@@ -1101,6 +1223,9 @@ class PhotoSortTUI(App):
             else:
                 self.write_to_log("[red]No directory selected in browser.[/red]")
                 return
+
+            # Log selection for critique context
+            self.write_to_log(f"   Target: {path.name}")
 
             self.app_config['last_source_path'] = str(path)
             self.write_to_log(f"✓ Source set to: {path}")
@@ -1141,7 +1266,7 @@ class PhotoSortTUI(App):
         available = None
         if ENGINE_AVAILABLE:
             try:
-                from photosort_engine import get_available_models
+                from fixxer_engine import get_available_models
                 models = get_available_models(self.write_to_log)
                 if models:
                     available = models
@@ -1278,6 +1403,9 @@ class PhotoSortTUI(App):
         for btn in self.query("Button"):
             if force:
                 btn.disabled = True
+            elif btn.id == "btn-stop":
+                # STOP button inverse logic - enabled ONLY during workflows
+                btn.disabled = not disabled
             elif btn.id != "btn-quit":
                 btn.disabled = disabled
     
@@ -1297,14 +1425,16 @@ class PhotoSortTUI(App):
             self.update_status("🚀 Running Auto...", {})
             
             # === CREATE STATS TRACKER WITH CALLBACK ===
-            from photosort_engine import StatsTracker
+            from fixxer_engine import StatsTracker
             tracker = StatsTracker(callback=self.on_stats_update)
             # ==========================================
             
+            self.stop_event.clear()
             result = auto_workflow(
                 log_callback=self.write_to_log,
                 app_config=self.app_config,
-                tracker=tracker
+                tracker=tracker,
+                stop_event=self.stop_event
             )
             self.write_to_log("[bold green]✓ Auto workflow completed![/bold green]")
             self.update_status("✅ Auto Complete", result if isinstance(result, dict) else {})
@@ -1319,15 +1449,17 @@ class PhotoSortTUI(App):
             self.update_status("📦 Grouping Bursts...", {})
             
             # === CREATE STATS TRACKER WITH CALLBACK ===
-            from photosort_engine import StatsTracker
+            from fixxer_engine import StatsTracker
             tracker = StatsTracker(callback=self.on_stats_update)
             # ==========================================
             
+            self.stop_event.clear()
             group_bursts_in_directory(
                 log_callback=self.write_to_log,
                 app_config=self.app_config,
                 simulated=False,
-                tracker=tracker
+                tracker=tracker,
+                stop_event=self.stop_event
             )
             self.write_to_log("[bold green]✓ Burst grouping completed![/bold green]")
             self.update_status("✅ Bursts Complete", {})
@@ -1342,15 +1474,17 @@ class PhotoSortTUI(App):
             self.update_status("✂️ Culling Images...", {})
             
             # === CREATE STATS TRACKER WITH CALLBACK ===
-            from photosort_engine import StatsTracker
+            from fixxer_engine import StatsTracker
             tracker = StatsTracker(callback=self.on_stats_update)
             # ==========================================
             
+            self.stop_event.clear()
             cull_images_in_directory(
                 log_callback=self.write_to_log,
                 app_config=self.app_config,
                 simulated=False,
-                tracker=tracker
+                tracker=tracker,
+                stop_event=self.stop_event
             )
             self.write_to_log("[bold green]✓ Culling completed![/bold green]")
             self.update_status("✅ Cull Complete", {})
@@ -1363,10 +1497,12 @@ class PhotoSortTUI(App):
     def run_stats_workflow_thread(self) -> None:
         try:
             self.update_status("📊 Analyzing Stats...", {})
+            self.stop_event.clear()
             show_exif_insights(
                 log_callback=self.write_to_log,
                 app_config=self.app_config,
-                simulated=False
+                simulated=False,
+                stop_event=self.stop_event
             )
             self.write_to_log("[bold green]✓ Stats analysis completed![/bold green]")
             self.update_status("✅ Stats Complete", {})
@@ -1381,22 +1517,31 @@ class PhotoSortTUI(App):
             self.update_status("🎨 Running AI Critique...", {})
             # Check if critique function exists in engine
             try:
-                from photosort_engine import critique_single_image
+                from fixxer_engine import critique_single_image
                 import json
                 
                 # Get first image from source directory for critique
-                source_path = self.app_config.get('last_source_path')
-                if not source_path or not Path(source_path).is_dir():
-                    self.write_to_log("[red]✗ No source directory set.[/red]")
-                    return
-                
-                # Find first image file
-                p = Path(source_path)
+                # OR use the currently selected file in the browser if it's an image
                 image_file = None
-                for f in p.iterdir():
-                    if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS:
-                        image_file = f
-                        break
+                
+                if self.file_browser and self.file_browser.cursor_node:
+                    node = self.file_browser.cursor_node
+                    if node.data and node.data.path.is_file():
+                        if node.data.path.suffix.lower() in SUPPORTED_EXTENSIONS:
+                            image_file = node.data.path
+                
+                if not image_file:
+                    source_path = self.app_config.get('last_source_path')
+                    if not source_path or not Path(source_path).is_dir():
+                        self.write_to_log("[red]✗ No source directory set.[/red]")
+                        return
+                    
+                    # Find first image file
+                    p = Path(source_path)
+                    for f in p.iterdir():
+                        if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS:
+                            image_file = f
+                            break
                 
                 if not image_file:
                     self.write_to_log("[red]✗ No images found in source directory.[/red]")
@@ -1424,7 +1569,7 @@ class PhotoSortTUI(App):
                 self.update_status("✅ Critique Complete", {})
             except ImportError:
                 self.write_to_log("[yellow]Critique function not available in engine.[/yellow]")
-                self.write_to_log("[dim]Add critique_single_image() to photosort_engine.py[/dim]")
+                self.write_to_log("[dim]Add critique_single_image() to fixxer_engine.py[/dim]")
                 self.update_status("⚠️ Not Available", {})
         except Exception as e:
             self.write_to_log(f"[bold red]✗ Critique failed: {e}[/bold red]")
@@ -1436,9 +1581,11 @@ class PhotoSortTUI(App):
         """Run the simple sort workflow (legacy mode)"""
         try:
             self.update_status("🗂️ Easy Archive Running...", {})
+            self.stop_event.clear()
             result = simple_sort_workflow(
                 log_callback=self.write_to_log,
-                app_config=self.app_config
+                app_config=self.app_config,
+                stop_event=self.stop_event
             )
             self.write_to_log("[bold green]✓ Easy Archive complete![/bold green]")
             self.update_status("✅ Archive Complete", result if isinstance(result, dict) else {})
@@ -1471,7 +1618,7 @@ class PhotoSortTUI(App):
 
 
 def main():
-    app = PhotoSortTUI()
+    app = FixxerTUI()
     app.run()
 
 

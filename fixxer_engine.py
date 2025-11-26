@@ -136,7 +136,7 @@ DEFAULT_CULL_THRESHOLDS = {
     'exposure_good_pct': 0.05
 }
 DEFAULT_BURST_THRESHOLD = 8
-CONFIG_FILE_PATH = Path.home() / ".photosort.conf"
+CONFIG_FILE_PATH = Path.home() / ".fixxer.conf"
 
 SUPPORTED_EXTENSIONS = {'.jpg', '.jpeg', '.png'}
 RAW_SUPPORT = False
@@ -529,6 +529,72 @@ def check_dcraw(log_callback: Callable[[str], None] = no_op_logger):
     log_callback("[yellow]Warning: check_dcraw() is deprecated. Using rawpy now.[/yellow]")
     check_rawpy(log_callback)
 
+def check_ollama_connection(
+    log_callback: Callable[[str], None] = no_op_logger,
+    all_systems_go: bool = True
+) -> bool:
+    """
+    Check if Ollama is running and accessible with 3-line llama narrative.
+    
+    Features a bilingual dad joke:
+    - Line 1: "Looking for llamas 🔎🦙"
+    - Line 2: Connection status
+    - Line 3: "¿Cómo se Llama? Se llama 'Speed' 🦙🦙💨" + system status
+    
+    Args:
+        log_callback: Logging function
+        all_systems_go: True if all critical dependencies (rawpy, BRISQUE, CLIP) are ready
+    
+    Returns:
+        True if Ollama is accessible, False otherwise
+    """
+    try:
+        # Line 1: The Search
+        log_callback("   [grey]Looking for llamas 🔎🦙[/grey]")
+        
+        response = requests.get("http://localhost:11434/api/tags", timeout=3)
+        
+        if response.status_code == 200:
+            data = response.json()
+            models = data.get('models', [])
+            model_count = len(models)
+            
+            # Line 2: The Discovery
+            log_callback(f"   [green]✓ Ollama connected[/green] ({model_count} models)")
+            
+            # Line 3: The Punchline + System Status
+            if all_systems_go:
+                status = "[green]✅ (FULL VISION)[/green]"
+            else:
+                status = "[yellow]⚠️  (limited features)[/yellow]"
+            
+            log_callback(
+                f"   [bold cyan]¿Cómo se Llama?[/bold cyan] "
+                f"[bold white]Se llama 'Speed'[/bold white] 🦙🦙💨    {status}"
+            )
+            
+            return True
+        else:
+            log_callback("   [yellow]⚠️ Ollama responded but status unclear[/yellow]")
+            return False
+            
+    except requests.exceptions.ConnectionError:
+        log_callback("   [grey]Looking for llamas 🔎🦙[/grey]")
+        log_callback("   [red]✗ Ollama not running[/red]")
+        log_callback("   [dim]No llamas found. Start with: [cyan]ollama serve[/cyan][/dim]")
+        return False
+        
+    except requests.exceptions.Timeout:
+        log_callback("   [grey]Looking for llamas 🔎🦙[/grey]")
+        log_callback("   [yellow]⚠️ Ollama connection timeout[/yellow]")
+        log_callback("   [dim]Llamas are hiding. Try again?[/dim]")
+        return False
+        
+    except Exception as e:
+        log_callback("   [grey]Looking for llamas 🔎🦙[/grey]")
+        log_callback(f"   [yellow]⚠️ Ollama check failed: {e}[/yellow]")
+        return False
+
 def get_available_models(log_callback: Callable[[str], None] = no_op_logger) -> Optional[List[str]]:
     """Get list of available Ollama models."""
     try:
@@ -732,7 +798,7 @@ def write_rename_log(log_path: Path, original_name: str, new_name: str, destinat
 def initialize_rename_log(log_path: Path):
     """(V9.3) Initialize the rename log file with a header."""
     try:
-        header = f"# PhotoSort AI Rename Log - {SESSION_TIMESTAMP}\n"
+        header = f"# FIXXER AI Rename Log - {SESSION_TIMESTAMP}\n"
         header += f"# Format: timestamp | original_name -> new_name | destination\n"
         header += "=" * 80 + "\n"
         with open(log_path, 'w') as f:
@@ -746,7 +812,7 @@ def initialize_rename_log(log_path: Path):
 
 def load_app_config() -> Dict[str, Any]:
     """
-    (V7.0) Loads settings from ~/.photosort.conf
+    (V7.0) Loads settings from ~/.fixxer.conf
     """
     parser = configparser.ConfigParser()
     config_loaded = False
@@ -817,7 +883,7 @@ def load_app_config() -> Dict[str, Any]:
 
 def save_app_config(config: Dict[str, Any]) -> bool:
     """
-    (V10.7) Save specific settings back to ~/.photosort.conf
+    (V10.7) Save specific settings back to ~/.fixxer.conf
     Only saves paths and model settings that are commonly changed during TUI use.
     """
     parser = configparser.ConfigParser()
@@ -992,22 +1058,23 @@ def get_image_hash(image_path: Path, log_callback: Callable[[str], None] = no_op
     if not V5_LIBS_AVAILABLE:
         log_callback("[red]Missing 'imagehash' library. Burst grouping will fail.[/red]")
         return image_path, None
-        
-    if image_path.suffix.lower() in ['.rw2', '.cr2', '.nef', '.arw', '.dng']:
-        try:
-            result = subprocess.run(
-                ['dcraw', '-e', '-c', str(image_path)],
-                capture_output=True,
-                check=True
-            )
-            img = Image.open(BytesIO(result.stdout))
-            return image_path, imagehash.phash(img)
-        except Exception:
-            return image_path, None
-           
+    
+    # NEW: Use your existing rawpy helper instead of dcraw subprocess!
+    # This handles ARW, CR2, NEF, etc. purely in memory.
     try:
+        raw_formats = {'.rw2', '.cr2', '.cr3', '.nef', '.arw', '.dng', '.raf', '.orf', '.pef', '.srw'}
+        if image_path.suffix.lower() in raw_formats:
+            jpeg_bytes = convert_raw_to_jpeg(image_path, log_callback)
+            if jpeg_bytes:
+                img = Image.open(BytesIO(jpeg_bytes))
+                return image_path, imagehash.phash(img)
+            else:
+                return image_path, None
+           
+        # Standard images (JPG, PNG, etc.)
         with Image.open(image_path) as img:
             return image_path, imagehash.phash(img)
+            
     except Exception as e:
         log_callback(f"     [yellow]Skipping hash for {image_path.name}: {e}[/yellow]")
         return image_path, None
@@ -1287,7 +1354,8 @@ Respond with ONLY a single JSON object in this exact format:
 
 def simple_sort_workflow(
     log_callback: Callable[[str], None] = no_op_logger,
-    app_config: Optional[Dict[str, Any]] = None
+    app_config: Optional[Dict[str, Any]] = None,
+    stop_event: Optional[threading.Event] = None
 ) -> Dict[str, Any]:
     """
     Simple workflow: AI name + organize by keyword into folders.
@@ -1353,6 +1421,10 @@ def simple_sort_workflow(
     success_count = 0
     
     for idx, img in enumerate(image_files, 1):
+        if stop_event and stop_event.is_set():
+            log_callback("\n[yellow]🛑 Workflow stopped by user.[/yellow]")
+            return {}
+            
         log_callback(f"   [{idx}/{len(image_files)}] {img.name}")
         original_path, success, new_name, description = process_single_image(
             img, temp_staging, chosen_model, log_callback=log_callback
@@ -1405,7 +1477,8 @@ def simple_sort_workflow(
 def auto_workflow(
     log_callback: Callable[[str], None] = no_op_logger,
     app_config: Optional[Dict[str, Any]] = None,
-    tracker: Optional[StatsTracker] = None
+    tracker: Optional[StatsTracker] = None,
+    stop_event: Optional[threading.Event] = None
 ) -> Dict[str, Any]:
     """(V9.3) Complete automated workflow: Stack → Cull → AI-Name → Archive."""
     
@@ -1459,17 +1532,20 @@ def auto_workflow(
     # --- 2. STATS PREVIEW ---
     log_callback("\n[bold]Step 2/5: Analyzing session (read-only)...[/bold]")
     try:
-        show_exif_insights(log_callback, app_config, simulated=True, directory_override=directory)
+        if stop_event and stop_event.is_set(): return {}
+        show_exif_insights(log_callback, app_config, simulated=True, directory_override=directory, stop_event=stop_event)
     except Exception as e:
         log_callback(f"     [yellow]Could not run EXIF analysis: {e}[/yellow]")
 
     # --- 3. GROUP BURSTS ---
+    if stop_event and stop_event.is_set(): return {}
     log_callback("\n[bold]Step 3/5: Stacking burst shots (with AI naming)...[/bold]")
-    group_bursts_in_directory(log_callback, app_config, directory_override=directory, tracker=tracker)
+    group_bursts_in_directory(log_callback, app_config, directory_override=directory, tracker=tracker, stop_event=stop_event)
 
     # --- 4. CULL SINGLES ---
+    if stop_event and stop_event.is_set(): return {}
     log_callback("\n[bold]Step 4/5: Culling single shots...[/bold]")
-    cull_images_in_directory(log_callback, app_config, directory_override=directory, tracker=tracker)
+    cull_images_in_directory(log_callback, app_config, directory_override=directory, tracker=tracker, stop_event=stop_event)
     tier_a_dir = directory / TIER_A_FOLDER
     
     # --- 5. FIND & ARCHIVE HEROES ---
@@ -1520,6 +1596,11 @@ def auto_workflow(
         }
         
         for i, future in enumerate(as_completed(future_to_file)):
+            if stop_event and stop_event.is_set():
+                log_callback("\n[yellow]🛑 Workflow stopped by user.[/yellow]")
+                executor.shutdown(wait=False, cancel_futures=True)
+                return {}
+                
             log_callback(f"   [grey]Processing item {i+1}/{len(hero_files)}...[/grey]")
             original, success, message, description = future.result()
             if success:
@@ -1610,7 +1691,8 @@ def group_bursts_in_directory(
     app_config: Optional[Dict[str, Any]] = None,
     simulated: bool = False,
     directory_override: Optional[Path] = None,
-    tracker: Optional[StatsTracker] = None
+    tracker: Optional[StatsTracker] = None,
+    stop_event: Optional[threading.Event] = None
 ) -> None:
     """(V9.3) Finds and stacks burst groups, AI-naming the best pick."""
     
@@ -1651,6 +1733,11 @@ def group_bursts_in_directory(
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         future_to_path = {executor.submit(get_image_hash, path, log_callback): path for path in image_files}
         for i, future in enumerate(as_completed(future_to_path)):
+            if stop_event and stop_event.is_set():
+                log_callback("\n[yellow]🛑 Workflow stopped by user.[/yellow]")
+                executor.shutdown(wait=False, cancel_futures=True)
+                return
+                
             log_callback(f"   [grey]Hashing image {i+1}/{len(image_files)}...[/grey]",)
             path, img_hash = future.result()
             if img_hash:
@@ -1766,7 +1853,8 @@ def cull_images_in_directory(
     app_config: Optional[Dict[str, Any]] = None,
     simulated: bool = False,
     directory_override: Optional[Path] = None,
-    tracker: Optional[StatsTracker] = None
+    tracker: Optional[StatsTracker] = None,
+    stop_event: Optional[threading.Event] = None
 ) -> None:
     """(V9.3) Finds and groups images by technical quality using Tier A/B/C naming."""
     
@@ -1808,6 +1896,11 @@ def cull_images_in_directory(
             for path in image_files
         }
         for i, future in enumerate(as_completed(future_to_path)):
+            if stop_event and stop_event.is_set():
+                log_callback("\n[yellow]🛑 Workflow stopped by user.[/yellow]")
+                executor.shutdown(wait=False, cancel_futures=True)
+                return
+
             log_callback(f"   [grey]Analyzing image {i+1}/{len(image_files)}...[/grey]")
             path, scores = future.result()
             if scores:
@@ -1877,7 +1970,8 @@ def show_exif_insights(
     log_callback: Callable[[str], None] = no_op_logger,
     app_config: Optional[Dict[str, Any]] = None,
     simulated: bool = False,
-    directory_override: Optional[Path] = None
+    directory_override: Optional[Path] = None,
+    stop_event: Optional[threading.Event] = None
 ) -> None:
     """(V6.4) Scans images, aggregates EXIF data, prints summary"""
     
@@ -1919,6 +2013,11 @@ def show_exif_insights(
             for path in image_files
         }
         for i, future in enumerate(as_completed(future_to_path)):
+            if stop_event and stop_event.is_set():
+                log_callback("\n[yellow]🛑 Workflow stopped by user.[/yellow]")
+                executor.shutdown(wait=False, cancel_futures=True)
+                return
+
             if not simulated:
                 log_callback(f"   [grey]Scanning image {i+1}/{len(image_files)}...[/grey]")
             result_dict = future.result()

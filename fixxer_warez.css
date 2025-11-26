@@ -1,19 +1,27 @@
 /* ==============================================================================
- * PhotoSort TUI v12.1 - VisionCrew Edition CSS
+ * FIXXER TUI v12.1 - VisionCrew Edition CSS
  * ============================================================================== */
 
 /* Base colors (variables) must be defined at the root */
-$background: rgb(10, 10, 10);  /* Very dark grey, almost black */
-$surface: rgb(20, 20, 20);     /* Panel background */
-$primary: #C00000;            /* Bright Red */
-$secondary: #FFFFFF;          /* White */
-$text: #CCCCCC;                /* Off-white text */
-$status-ok: #00FFFF;          /* Cyan for "Ready" status */
+$background: rgb(10, 10, 10);
+/* Very dark grey, almost black */
+$surface: rgb(20, 20, 20);
+/* Panel background */
+$primary: #C00000;
+/* Bright Red */
+$secondary: #FFFFFF;
+/* White */
+$text: #CCCCCC;
+/* Off-white text */
+$status-ok: #00FFFF;
+/* Cyan for "Ready" status */
 
 Screen {
+    layout: vertical;
     background: $background;
     color: $text;
-    border: solid $primary;  /* Simple border, no width percentage */
+    border: solid $primary;
+    /* Simple border, no width percentage */
 }
 
 /* ==============================================================================
@@ -29,7 +37,8 @@ Screen {
 #logo {
     width: 1fr;
     height: auto;
-    text-align: left;  /* Left-aligned logo */
+    text-align: left;
+    /* Left-aligned logo */
     padding: 1 2;
 }
 
@@ -60,11 +69,17 @@ Screen {
 #left-panel {
     padding-right: 1;
     width: 1fr;
+    height: 100%;
 }
 
 #right-panel {
     padding-left: 1;
     width: 1fr;
+    height: 100%;
+}
+
+#main-layout {
+    height: 1fr;
 }
 
 /* ==============================================================================
@@ -74,6 +89,7 @@ Screen {
 Button {
     outline: none;
 }
+
 Button:focus {
     border: solid $primary;
 }
@@ -83,9 +99,11 @@ Scrollbar {
     background: $surface;
     color: $primary;
 }
+
 Scrollbar:hover {
     color: #FF0000;
 }
+
 Scrollbar.-active {
     color: #FF4444;
 }
@@ -124,24 +142,29 @@ DirectoryTree {
 /* --- System Monitor --- */
 #system-monitor {
     height: auto;
+    max-height: 8;
+    /* Reduced from 9 for tighter fit */
+    width: 100%;
+    layout: vertical;
     margin-bottom: 1;
-    padding: 1 1;  /* FIXED: Added vertical padding for breathing room */
-    align: center middle;  /* FIXED: Center content vertically and horizontally */
-    background: $surface;
-    border: solid $primary 50%;
+    padding: 1 2 0 2;
+    /* Top padding for RAM peaks, no bottom padding */
+    background: $background;
+    border: solid $surface;
 }
 
-#sysmon-row-1,
-#sysmon-row-2 {
+.sysmon-row {
     height: auto;
     width: 100%;
     align: left middle;
     padding: 0;
+    margin: 0;
 }
 
 .sysmon-label {
     width: 6;
-    color: $primary;
+    color: $text;
+    /* Changed from $primary to muted text */
     text-style: bold;
 }
 
@@ -154,6 +177,8 @@ DirectoryTree {
 .sysmon-value {
     width: 5;
     text-align: right;
+    color: $primary;
+    /* Keep values in red */
     text-style: bold;
 }
 
@@ -162,18 +187,21 @@ DirectoryTree {
     text-align: center;
 }
 
-/* Sparkline styling - WHITE for tactical look */
+/* Sparkline styling - RED for VisionCrew tactical look */
 #ram-sparkline {
-    color: $secondary;
+    color: $primary !important;
+    /* Force red for RAM */
 }
 
 #cpu-sparkline {
-    color: $secondary;
+    color: $primary !important;
+    /* Force red for CPU */
 }
 
 #log-panel {
     height: 1fr;
-    min-height: 15;
+    min-height: 20;
+    /* Increased from 15 for better visibility */
     max-height: 1fr;
 }
 
@@ -226,31 +254,91 @@ DirectoryTree {
     width: 100%;
     align: center middle;
     padding: 1 0;
+    layout: horizontal;
+    background: $background;
+}
+
+/* RAM and CPU monitors hidden in footer for standard mode */
+/* (They appear in right panel above Status & Logs instead) */
+#ram-monitor,
+#cpu-monitor {
+    display: none;
+}
+
+#controls-container {
+    width: 100%;
+    height: auto;
+    align: center middle;
+}
+
+#header-right {
+    width: auto;
+    height: auto;
+    align: right middle;
+}
+
+/* View mode label hidden in standard mode */
+#view-mode-label {
+    display: none;
+}
+
+.btn-group {
+    height: auto;
+    width: auto;
+    align: center middle;
+    margin: 0 2;
 }
 
 .workflow-btn,
 .path-btn {
     margin: 0 1;
-    width: 1fr;
+    width: auto;
+    min-width: 10;
     background: $surface;
-    color: $primary;
+    color: #ffffff;
     border: solid $primary 50%;
 }
 
 .workflow-btn:hover,
-.path-btn:hover {
+.path-btn:hover,
+.control-btn:hover {
     background: $primary;
     color: $background;
     text-style: bold;
     border: solid $primary;
 }
 
-#btn-quit {
-    background: $primary;
-    color: $background;
-    text-style: bold;
-    border: solid $primary;
+.control-btn {
+    margin: 0 1;
+    width: auto;
+    min-width: 14;
+    height: 3;
+    background: $surface;
+    color: #ffffff;
+    border: solid $primary 50%;
+    text-align: center;
 }
+
+#btn-quit,
+#btn-stop {
+    color: $error;
+    border: solid $error;
+}
+
+#btn-quit:hover,
+#btn-stop:hover {
+    background: $error;
+    color: $surface;
+}
+
+#btn-stop:disabled {
+    background: $surface;
+    color: #444444;
+    border: solid #444444;
+    opacity: 0.5;
+}
+
+
 
 #btn-quit:hover {
     background: $surface;

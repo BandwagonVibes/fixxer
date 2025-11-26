@@ -1,8 +1,10 @@
-# PhotoSort TUI (v12.1) - VisionCrew Edition
+# FIXXER ✞ TUI (v1.0) - Professional-Grade Edition
 
-## New: Terminal User Interface
+## Terminal User Interface with Hash Verification
 
-PhotoSort now includes a full-featured TUI (Terminal User Interface) alongside the original CLI.
+FIXXER now includes a full-featured TUI (Terminal User Interface) with SHA256 integrity verification for every file operation.
+
+**"CHAOS PATCHED // LOGIC INJECTED"**
 
 ### Quick Start
 
@@ -13,8 +15,11 @@ python photosort_tui_styled.py
 
 ### Features
 
+- **SHA256 hash verification** - Every file move cryptographically verified
+- **JSON audit trail** - .fixxer.json sidecar files for integrity tracking
+- **Halt-on-corruption** - Workflow stops immediately if hash mismatch detected
 - **Visual file browser** - Navigate directories with mouse or keyboard
-- **Real-time log panel** - Watch operations as they happen
+- **Real-time log panel** - Watch hash calculations and operations in real-time
 - **Animated progress indicator** - Block spinner with rotating motivational phrases
 - **Engine status checks** - BRISQUE and CLIP detection at startup
 - **Persistent config** - Settings auto-save to `~/.photosort.conf`
@@ -110,6 +115,15 @@ The TUI automatically saves changes when you modify source, destination, or mode
 ---
 
 ## Version History
+
+### FIXXER v1.0 (2025-01-20)
+**"CHAOS PATCHED // LOGIC INJECTED"**
+- SHA256 hash verification for all file operations
+- JSON sidecar audit trail (.fixxer.json files)  
+- Halt-on-mismatch corruption detection
+- Complete rebrand to FIXXER ✞
+- Real-time hash verification logging in TUI
+- Professional-grade integrity protection
 
 ### TUI v12.1 (2025-11-16)
 - Fixed mouse event leakage (imports at module load time)
