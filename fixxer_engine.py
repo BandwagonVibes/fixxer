@@ -854,6 +854,11 @@ def load_app_config() -> Dict[str, Any]:
         'burst', 'burst_algorithm',
         fallback=DEFAULT_BURST_ALGORITHM
     )
+    # v1.1: Burst auto-naming toggle (default: false for speed)
+    config['burst_auto_name'] = parser.getboolean(
+        'burst', 'burst_auto_name',
+        fallback=False
+    )
     config['critique_model'] = parser.get(
         'critique', 'default_model',
         fallback=DEFAULT_CRITIQUE_MODEL
@@ -1540,7 +1545,10 @@ def auto_workflow(
     # --- 3. GROUP BURSTS ---
     if stop_event and stop_event.is_set(): return {}
     log_callback("\n[bold]Step 3/5: Stacking burst shots (with AI naming)...[/bold]")
-    group_bursts_in_directory(log_callback, app_config, directory_override=directory, tracker=tracker, stop_event=stop_event)
+    # v1.1: Auto workflow ALWAYS does AI naming, regardless of burst_auto_name config
+    auto_config = app_config.copy()
+    auto_config['burst_auto_name'] = True
+    group_bursts_in_directory(log_callback, auto_config, directory_override=directory, tracker=tracker, stop_event=stop_event)
 
     # --- 4. CULL SINGLES ---
     if stop_event and stop_event.is_set(): return {}
@@ -1694,7 +1702,13 @@ def group_bursts_in_directory(
     tracker: Optional[StatsTracker] = None,
     stop_event: Optional[threading.Event] = None
 ) -> None:
-    """(V9.3) Finds and stacks burst groups, AI-naming the best pick."""
+    """
+    (V1.1) Finds and stacks burst groups, optionally AI-naming the best pick.
+
+    By default (burst_auto_name=false), uses fast numeric naming.
+    Set burst_auto_name=true in config to enable AI naming (slower).
+    Auto workflow always uses AI naming regardless of this setting.
+    """
     
     if app_config is None: app_config = load_app_config()
     
@@ -1795,25 +1809,37 @@ def group_bursts_in_directory(
         log_callback(f"   Organizing burst groups into: {bursts_parent.name}/")
         bursts_parent.mkdir(exist_ok=True)
     
-    rename_log_path = directory / f"_ai_rename_log_{SESSION_TIMESTAMP}.txt"
-    initialize_rename_log(rename_log_path)
-    ai_model = app_config.get('default_model', DEFAULT_MODEL_NAME)
-    
+    # v1.1: Check if AI naming is enabled for burst workflow
+    burst_auto_name = app_config.get('burst_auto_name', False)
+
+    if burst_auto_name:
+        rename_log_path = directory / f"_ai_rename_log_{SESSION_TIMESTAMP}.txt"
+        initialize_rename_log(rename_log_path)
+        ai_model = app_config.get('default_model', DEFAULT_MODEL_NAME)
+        log_callback("   [grey]AI naming enabled for bursts...[/grey]")
+
     for i, group in enumerate(all_burst_groups):
         winner_data = best_picks.get(i)
         sample_image = winner_data[0] if winner_data else group[0]
-        
-        log_callback(f"   [grey]Burst {i+1}/{len(all_burst_groups)}: Generating AI name...[/grey]")
-        ai_result = get_ai_image_name(sample_image, ai_model, log_callback)
-        
-        if ai_result and ai_result.get('filename'):
-            base_name = ai_result['filename']
-            folder_name = f"{base_name}_burst"
-            log_callback(f"     [green]✓ AI named:[/green] {base_name}")
+
+        # Only run AI naming if enabled
+        if burst_auto_name:
+            log_callback(f"   [grey]Burst {i+1}/{len(all_burst_groups)}: Generating AI name...[/grey]")
+            ai_result = get_ai_image_name(sample_image, ai_model, log_callback)
+
+            if ai_result and ai_result.get('filename'):
+                base_name = ai_result['filename']
+                folder_name = f"{base_name}_burst"
+                log_callback(f"     [green]✓ AI named:[/green] {base_name}")
+            else:
+                base_name = f"burst-{i+1:03d}"
+                folder_name = base_name
+                log_callback(f"     [yellow]⚠️ AI naming failed, using:[/yellow] {base_name}")
         else:
+            # Fast mode: Just use numeric naming
             base_name = f"burst-{i+1:03d}"
             folder_name = base_name
-            log_callback(f"     [yellow]⚠️ AI naming failed, using:[/yellow] {base_name}")
+            log_callback(f"   [grey]Burst {i+1}/{len(all_burst_groups)}: {folder_name} ({len(group)} files)[/grey]")
         
         folder_path = bursts_parent / folder_name
         if folder_path.exists():
@@ -1840,11 +1866,13 @@ def group_bursts_in_directory(
             try:
                 # FIXXER v1.0: Hash-verified move
                 verify_file_move_with_hash(file_path, new_file_path, log_callback, generate_sidecar=True)
-                write_rename_log(rename_log_path, file_path.name, new_name, folder_path)
+                if burst_auto_name:
+                    write_rename_log(rename_log_path, file_path.name, new_name, folder_path)
             except Exception as e:
                 log_callback(f"     [red]FAILED to move {file_path.name}: {e}[/red]")
-    
-    log_callback(f"   Rename log saved: {rename_log_path.name}")
+
+    if burst_auto_name:
+        log_callback(f"   Rename log saved: {rename_log_path.name}")
 
 # --- Cull Workflow ---
 

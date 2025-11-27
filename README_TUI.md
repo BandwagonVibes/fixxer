@@ -9,8 +9,11 @@ FIXXER now includes a full-featured TUI (Terminal User Interface) with SHA256 in
 ### Quick Start
 
 ```bash
-# Run the TUI
-python photosort_tui_styled.py
+# After installing with pip install -e .
+fixxer
+
+# Or run directly from source
+python fixxer_tui.py
 ```
 
 ### Features
@@ -23,28 +26,28 @@ python photosort_tui_styled.py
 - **Animated progress indicator** - Block spinner with rotating motivational phrases
 - **Engine status checks** - BRISQUE and CLIP detection at startup
 - **Persistent config** - Settings auto-save to `~/.photosort.conf`
-- **Custom theme** - "Warez" aesthetic with red/white/black color scheme
+- **Dual UI modes** - Toggle between Warez and Pro (Phantom Redline) with F12
+- **Milestone HUD** - Real-time stats dashboard in Pro Mode (BURSTS, TIER A/B/C, TIME)
+- **Tooltip hints** - Hover over buttons to see keyboard shortcuts
 
 ### Files
 
-- `photosort_tui_styled.py` - Main TUI application (v12.1)
-- `photosort_visioncrew.css` - Theme stylesheet
-- `photosort_engine.py` - Backend engine (v10.7)
-- `phrases.py` - Rotating progress messages (optional)
+- `fixxer_tui.py` - Main TUI application (v1.0)
+- `fixxer_warez.css` - Standard Mode theme (Warez aesthetic)
+- `fixxer_pro.css` - Pro Mode theme (Phantom Redline)
+- `fixxer_engine.py` - Backend engine with hash verification (v1.0)
+- `phrases.py` - Rotating progress messages
 
 ### Dependencies
 
-The TUI requires additional packages beyond the CLI:
+All dependencies are now included by default:
 
 ```bash
-pip install textual rich
+# One command installs everything (CLIP, BRISQUE, TUI, Engine)
+pip install -e .
 ```
 
-Or install everything:
-
-```bash
-pip install -r requirements.txt
-```
+This installs the complete professional suite with no optional add-ons needed.
 
 ### System Requirements
 
@@ -82,11 +85,29 @@ pip install -r requirements.txt
 
 ### Keyboard Shortcuts
 
-- `q` - Quit
-- `1` - Set source (from browser selection)
-- `2` - Set destination (opens selector)
-- Arrow keys - Navigate file browser
-- Mouse click - Select directories/buttons
+**Navigation & Setup:**
+- `1` - Set Source directory (from browser selection)
+- `2` - Set Destination directory (opens selector)
+- `M` - Select Ollama Model
+- `F12` - Toggle Pro Mode (Warez ↔ Phantom Redline aesthetic)
+
+**Workflows:**
+- `A` - Auto Workflow (complete pipeline)
+- `B` - Bursts (group similar shots)
+- `C` - Cull (quality analysis into Tier A/B/C)
+- `S` - Stats (EXIF insights and session analytics)
+- `K` - Critique (AI creative feedback on selected image)
+
+**System:**
+- `Q` - Quit application
+- `R` - Refresh config (reload ~/.photosort.conf)
+- `Esc` - Stop current workflow
+- `Ctrl+C` - Force quit
+
+**Mouse:**
+- Click buttons or use keyboard shortcuts
+- Navigate file browser with arrow keys or mouse
+- Hover over buttons to see tooltips with keyboard hints
 
 ### Engine Detection
 

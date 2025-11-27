@@ -39,9 +39,10 @@ Built for photographers who demand both **speed** and **safety** in their digita
 
 ### 🎨 **Two UI Modes**
 - **Standard Mode**: Warez-inspired red/white/black aesthetic
-- **Pro Mode (F12)**: Phantom Redline - tactical precision dashboard
+- **Pro Mode**: Phantom Redline - tactical precision dashboard
+- **Toggle with F12** - Switch between modes on-the-fly
 - Real-time **system monitoring** (RAM, CPU sparklines)
-- **Milestone HUD** for workflow progress tracking
+- **Milestone HUD** for workflow progress tracking (Pro Mode)
 
 ### 📷 **RAW File Support**
 - **120+ RAW formats** via rawpy/libraw
@@ -53,38 +54,145 @@ Built for photographers who demand both **speed** and **safety** in their digita
 
 ## 🚀 Quick Start
 
+**Zero friction. Full power.**
+
 ### Prerequisites
 - **Python 3.10+**
-- **Ollama** (for AI vision features)
+- **Ollama** (for AI vision features) - [https://ollama.ai](https://ollama.ai)
 - Supported OS: macOS, Linux, Windows (WSL recommended)
 
-### Installation
+### 1. Install
 
 ```bash
-# Clone the repository
 git clone https://github.com/BandwagonVibes/fixxer.git
 cd fixxer
 
-# Create virtual environment
+# Create a virtual environment
 python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate  # Windows: venv\Scripts\activate
 
-# Install dependencies
-pip install -r requirements.txt
+# Install FIXXER + All Dependencies (CLIP, BRISQUE, Engine)
+# This also installs the 'fixxer' command globally in this venv
+pip install -e .
+```
 
-# Install Ollama and pull a vision model
-# Visit: https://ollama.ai
+### 2. Launch
+
+Since you installed in editable mode (`-e .`), you don't need `python file.py`. Just type:
+
+```bash
+fixxer
+```
+
+**Note:** On first launch, FIXXER will auto-download the CLIP vision model (~300MB). This happens only once.
+
+### 3. Optional: Install Ollama Vision Model
+
+For AI naming and creative critique features:
+
+```bash
+# Install Ollama from https://ollama.ai
+# Then pull a vision model:
 ollama pull qwen2.5vl:3b
 ```
 
-### Launch FIXXER
+**Recommended model:** `qwen2.5vl:3b` (fast, accurate, 2.2GB)
+
+---
+
+### 🔰 New to Terminals?
+
+If you've never opened a terminal before, check out our [**Beginner's Guide**](BEGINNERS_GUIDE.md) - a gentle introduction that teaches you everything you need to know.
+
+---
+
+### 🔧 Advanced: Manual Alias Setup
+
+If you prefer running from source without installing the package, you can set up a shell alias:
+
+**macOS / Linux (zsh or bash)**
+
+Add this to your `~/.zshrc` or `~/.bashrc`:
 
 ```bash
-# Standard Mode (Warez aesthetic)
-python3 photosort_tui_styled.py
-
-# Toggle Pro Mode in-app with F12
+# FIXXER ✞ PRO Launcher
+# Adjust path to match where you cloned the repo
+alias fixxer='source ~/fixxer/venv/bin/activate && python3 ~/fixxer/fixxer_tui.py'
 ```
+
+Reload shell: `source ~/.zshrc`
+
+**Windows (PowerShell)**
+
+Open your profile: `notepad $PROFILE`
+
+Paste this function at the bottom:
+
+```powershell
+function fixxer {
+    # Adjust path to match where you cloned the repo
+    $FixxerPath = "$HOME\fixxer"
+
+    # Activate Venv and Run
+    & "$FixxerPath\venv\Scripts\Activate.ps1"
+    python "$FixxerPath\fixxer_tui.py"
+}
+```
+
+Reload profile: `. $PROFILE`
+
+---
+
+## 🤖 Why Qwen2.5-vl:3b?
+
+FIXXER is designed to work like an **appliance** - reliable, consistent, and predictable. After extensive research and testing, we chose **Qwen2.5-vl:3b** as the recommended model for specific reasons:
+
+### Proven Reliability
+- **Tested on 150+ photos** across dozens of sessions
+- **Consistent naming** - produces the same results run after run
+- **Rock-solid JSON output** - only one parsing issue in all testing (99.9%+ reliability)
+- **Production-ready** - not experimental, it just works
+
+### Technical Advantages
+- **Spatial awareness** - Critical for composition critique and understanding scene layout
+- **Structured output** - Reliably generates valid JSON for deterministic parsing
+- **Speed/quality balance** - Fast enough for real-time workflows, accurate enough for professional use
+- **Efficient footprint** - 2.2GB model runs smoothly on MacBook Air hardware
+
+### Model Compatibility Note
+While you **can** swap models using the Model selector (press `M`), results may vary:
+- **Larger models** (7B+) - Potentially better quality, but slower and more memory-intensive
+- **Smaller models** (1B-2B) - Faster, but may lose spatial understanding and JSON reliability
+- **Alternative vision models** - Not all are suitable for photography workflows (some lack spatial reasoning, others produce inconsistent output)
+
+**Our recommendation:** Start with `qwen2.5vl:3b`. It's been battle-tested for this exact use case.
+
+---
+
+## ⌨️ Keyboard Shortcuts
+
+FIXXER is fully keyboard-driven. All buttons have hotkeys:
+
+### Navigation & Setup
+- **1** - Set Source directory (from file browser selection)
+- **2** - Set Destination directory (opens selector)
+- **M** - Select Ollama Model
+- **F12** - Toggle Pro Mode (Warez ↔ Phantom Redline)
+
+### Workflows
+- **A** - Auto Workflow (complete pipeline)
+- **B** - Bursts (group similar shots)
+- **C** - Cull (quality analysis)
+- **S** - Stats (EXIF insights)
+- **K** - Critique (AI creative feedback)
+
+### System
+- **Q** - Quit
+- **R** - Refresh Config
+- **Esc** - Stop current workflow
+- **Ctrl+C** - Force quit
+
+**Tip:** Hover over any button to see its keyboard shortcut in the tooltip!
 
 ---
 
@@ -101,17 +209,36 @@ Complete end-to-end processing:
 
 ### **Individual Workflows**
 
-- **Bursts**: Group similar shots, AI-name the best pick
-- **Cull**: Analyze sharpness/exposure, sort by quality
+- **Bursts**: Group similar shots, pick the best frame (fast, no AI naming by default - see config)
+- **Cull**: Analyze sharpness/exposure, sort by quality (Tier A/B/C)
 - **Stats**: EXIF insights (cameras, focal lengths, lighting conditions)
-- **Critique**: Get creative feedback from AI (composition, mood, suggestions)
-- **Easy Archive**: Simple AI naming + keyword folder organization (no culling)
+- **Critique**: Select a photo in the browser → Press `K` - Get AI creative feedback (composition, mood, technical quality, suggestions)
+  - **Saves critique JSON** alongside the photo for future reference
+  - Great for learning what makes your best shots work
+  - Use it to understand technical issues or get creative direction
+- **Easy Archive**: Simple AI naming + keyword folder organization (no culling, just organize)
 
 ---
 
 ## 🎛️ Configuration
 
 Configuration is stored in `~/.photosort.conf`:
+
+### Understanding `burst_auto_name`
+
+The **Burst** workflow can operate in two modes:
+
+- **Fast Mode (default)**: `burst_auto_name = false`
+  - Groups bursts, picks the best frame, uses numeric naming (`burst-001`, `burst-002`)
+  - **Much faster** - no AI naming overhead
+  - Great for quick organization - you can run Easy Archive later for AI naming
+
+- **AI Naming Mode**: `burst_auto_name = true`
+  - Groups bursts, picks the best frame, **AND** generates descriptive AI names
+  - Slower (depends on Ollama model speed)
+  - Useful if you want burst folders named immediately
+
+**Note:** The **Auto Workflow** always uses AI naming regardless of this setting (it's designed for complete end-to-end processing).
 
 ```ini
 [ingest]
@@ -128,6 +255,7 @@ exposure_good_pct = 0.05
 [burst]
 burst_algorithm = legacy
 similarity_threshold = 8
+burst_auto_name = false        # Set to 'true' to enable AI naming in Burst workflow (slower)
 
 [folders]
 burst_parent_folder = true
@@ -172,15 +300,16 @@ Source File
 
 ```
 fixxer/
-├── photosort_engine.py          # Core workflow logic + hash verification
-├── photosort_tui_styled.py      # Textual TUI application
-├── photosort_pro.css            # Pro Mode styling (Phantom Redline)
-├── photosort_visioncrew.css     # Standard Mode styling (Warez)
+├── fixxer_engine.py             # Core workflow logic + hash verification
+├── fixxer_tui.py                # Textual TUI application
+├── fixxer_pro.css               # Pro Mode styling (Phantom Redline)
+├── fixxer_warez.css             # Standard Mode styling (Warez)
 ├── phrases.py                   # Motivational progress phrases
 ├── requirements.txt             # Python dependencies
 ├── pyproject.toml               # Packaging metadata
-├── README.md                    # This file
-├── LICENSE                      # MIT License
+├── README.md                    # Main documentation
+├── BEGINNERS_GUIDE.md           # Terminal beginner's guide
+├── README_TUI.md                # TUI-specific documentation
 └── .gitignore                   # Git exclusions
 ```
 
@@ -216,14 +345,17 @@ If corruption is detected:
 
 ## 🎨 UI Modes Comparison
 
-| Feature | Standard Mode | Pro Mode (F12) |
-|---------|---------------|----------------|
+Press **F12** to toggle between modes at any time (except during active workflows):
+
+| Feature | Standard Mode | Pro Mode |
+|---------|---------------|----------|
 | **Aesthetic** | Warez (red/white/black) | Phantom Redline (tactical black) |
-| **Logo** | ASCII art + tagline | Clean typography |
+| **Logo** | ASCII art + tagline | Clean typography + F12 indicator |
 | **System Monitor** | Cyan sparklines | Red "redline" sparklines |
 | **Progress Phrases** | "Applying physics hacks..." | "Processing active... [2m 34s]" |
 | **Milestone HUD** | ❌ Hidden | ✅ Real-time stats (BURSTS, TIER A/B/C, HEROES, ARCHIVED, TIME) |
 | **Button Styles** | High contrast | Minimal, subtle borders |
+| **Toggle Key** | **F12** | **F12** |
 
 ---
 

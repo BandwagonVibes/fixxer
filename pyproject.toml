@@ -11,13 +11,10 @@ requires-python = ">=3.10"
 license = {text = "MIT"}
 keywords = ["photography", "workflow", "automation", "ai", "vision", "raw", "photo-management"]
 authors = [
-    {name = "Your Name", email = "your.email@example.com"}
-]
-maintainers = [
-    {name = "Your Name", email = "your.email@example.com"}
+    {name = "BandwagonVibes"}
 ]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: End Users/Desktop",
     "Topic :: Multimedia :: Graphics",
     "Topic :: Multimedia :: Graphics :: Graphics Conversion",
@@ -34,46 +31,36 @@ dependencies = [
     # Core TUI Framework
     "textual>=0.47.0",
     "rich>=13.7.0",
-    
+
     # Image Processing (Core)
     "Pillow>=10.0.0",
     "opencv-python>=4.8.0",
     "numpy>=1.24.0",
-    
+
     # RAW File Support
     "rawpy>=0.19.0",
-    
+
     # Perceptual Hashing (Burst Detection)
     "ImageHash>=4.3.1",
-    
+
     # EXIF Data
     "ExifRead>=3.0.0",
-    
+
     # HTTP Requests (Ollama API)
     "requests>=2.31.0",
-    
-    # System Monitoring (Optional)
+
+    # System Monitoring
     "psutil>=5.9.0",
+
+    # MOVED FROM OPTIONAL TO MAIN:
+    # Advanced Quality Assessment (BRISQUE)
+    "image-quality>=1.2.7",
+    # Advanced Burst Detection (CLIP)
+    "sentence-transformers>=2.2.0",
+    "scikit-learn>=1.3.0",
 ]
 
 [project.optional-dependencies]
-# Advanced Quality Assessment
-brisque = [
-    "image-quality>=1.2.7",
-]
-
-# Advanced Burst Detection (CLIP)
-clip = [
-    "sentence-transformers>=2.2.0",
-    "scikit-learn>=1.3.0",
-]
-
-# Full feature set
-all = [
-    "image-quality>=1.2.7",
-    "sentence-transformers>=2.2.0",
-    "scikit-learn>=1.3.0",
-]
 
 # Development tools
 dev = [
@@ -91,11 +78,12 @@ Repository = "https://github.com/BandwagonVibes/fixxer.git"
 Changelog = "https://github.com/BandwagonVibes/fixxer/releases"
 
 [project.scripts]
-fixxer = "photosort_tui_styled:main"
-fixxer-tui = "photosort_tui_styled:main"
+# This creates the magic 'fixxer' command in the user's bin folder
+fixxer = "fixxer_tui:main"
 
 [tool.setuptools]
-py-modules = ["photosort_engine", "photosort_tui_styled", "phrases"]
+# Ensure these match your actual filenames
+py-modules = ["fixxer_engine", "fixxer_tui", "phrases"]
 
 [tool.setuptools.package-data]
 "*" = ["*.css"]
@@ -137,7 +125,7 @@ testpaths = [
 
 # Coverage configuration
 [tool.coverage.run]
-source = ["photosort_engine", "photosort_tui_styled", "phrases"]
+source = ["fixxer_engine", "fixxer_tui", "phrases"]
 omit = [
     "*/tests/*",
     "*/venv/*",
