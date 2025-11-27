@@ -64,6 +64,7 @@ Screen {
     border: solid $surface;
     text-style: bold;
     text-align: center;
+    align: center middle;
 }
 
 #btn-easy:hover {
@@ -535,7 +536,7 @@ DirectoryTree {
 /* Color-coded tier values */
 .hud-val-a {
     width: auto;
-    min-width: 3;
+    min-width: 4;
     /* Minimum width for alignment */
     text-align: center;
     color: $primary;
@@ -545,7 +546,7 @@ DirectoryTree {
 
 .hud-val-b {
     width: auto;
-    min-width: 3;
+    min-width: 4;
     /* Minimum width for alignment */
     text-align: center;
     color: $text;
@@ -555,7 +556,7 @@ DirectoryTree {
 
 .hud-val-c {
     width: auto;
-    min-width: 3;
+    min-width: 4;
     /* Minimum width for alignment */
     text-align: center;
     color: $redline;
@@ -581,7 +582,7 @@ DirectoryTree {
 
 /* Tiers box - wider to fit A/B/C layout */
 #hud-tiers {
-    min-width: 14;
+    min-width: 18;
     /* Wider for proper alignment of letters and numbers */
 }
 
