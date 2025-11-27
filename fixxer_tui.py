@@ -628,11 +628,14 @@ class MilestoneHUD(Container):
 
 class FixxerTUI(App):
     """The main TUI application for FIXXER."""
-    
+
     # v10.0: CSS is now loaded dynamically based on pro_mode config
     # We'll load CSS content in __init__ instead of using CSS_PATH
     CSS = ""  # Will be populated in __init__
-    
+
+    # Terminal window title (appears in title bar)
+    TITLE = "FIXXER"
+
     # Add a border title to the main app screen
     BORDER_TITLE = "V.C.S. INTERFACE"
     
