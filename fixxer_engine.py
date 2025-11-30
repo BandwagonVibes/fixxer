@@ -740,6 +740,32 @@ def get_unique_filename(base_name: str, extension: str, destination: Path) -> Pa
             return filename
         counter += 1
 
+def get_unique_filename_simulated(base_name: str, extension: str, destination: Path, simulated_paths: set) -> Path:
+    """
+    Generate unique filename for preview mode using simulated_paths set.
+
+    This is critical for accurate collision detection in dry-run mode where
+    files don't actually exist yet but we need to simulate naming conflicts.
+
+    Args:
+        base_name: Base filename without extension
+        extension: File extension (including dot)
+        destination: Destination directory path
+        simulated_paths: Set of Path objects representing files that will exist
+
+    Returns:
+        Path object with collision-free filename
+    """
+    filename = destination / f"{base_name}{extension}"
+    if filename not in simulated_paths:
+        return filename
+    counter = 1
+    while True:
+        filename = destination / f"{base_name}-{counter:02d}{extension}"
+        if filename not in simulated_paths:
+            return filename
+        counter += 1
+
 def format_duration(duration: timedelta) -> str:
     """Converts timedelta to readable string like '1d 4h 15m'"""
     total_seconds = int(duration.total_seconds())
@@ -979,6 +1005,82 @@ You MUST return ONLY a single, valid JSON object, formatted *exactly* like this:
         log_callback(f"   [red]Error processing {image_path.name}: {e}[/red]")
         return None, None
 
+def get_ai_name_with_cache(
+    img_path: Path,
+    model: str,
+    cache: Optional[Dict[str, Dict]],
+    cache_lock: Optional[threading.Lock],
+    log_callback: Callable[[str], None] = no_op_logger
+) -> Tuple[Optional[str], Optional[List[str]]]:
+    """
+    Get AI name/tags, using cache if valid (dry-run preview feature).
+
+    Thread-safe caching with validation:
+    - Checks file modification time (mtime) to detect changes
+    - Checks cache age (10 min expiry)
+    - Model-aware cache keys: f"{model}:{path}"
+    - Protected by threading.Lock for concurrent access
+
+    Args:
+        img_path: Image file path
+        model: Ollama model name
+        cache: Optional cache dict (None = always run AI)
+        cache_lock: Optional threading.Lock for thread-safe cache access
+        log_callback: Logging function
+
+    Returns:
+        Tuple of (filename: str, tags: List[str]) or (None, None) on failure
+    """
+    if cache is None:
+        # No cache provided, always run AI
+        return get_ai_description(img_path, model, log_callback)
+
+    # Model-aware cache key (critical: different models = different results)
+    cache_key = f"{model}:{str(img_path.absolute())}"
+    current_mtime = img_path.stat().st_mtime
+
+    # Thread-safe cache read
+    cached_entry = None
+    if cache_lock:
+        with cache_lock:
+            cached_entry = cache.get(cache_key)
+    else:
+        cached_entry = cache.get(cache_key)
+
+    # Check cache validity
+    if cached_entry:
+        # Validate: file unchanged + cache fresh (<10 min)
+        age = time.time() - cached_entry['cached_at']
+        if cached_entry['mtime'] == current_mtime and age < 600:
+            log_callback(f"   [dim]⚡ Using cached AI result[/dim]")
+            return cached_entry['filename'], cached_entry['tags']
+        else:
+            # Cache invalid (file changed or expired)
+            if cached_entry['mtime'] != current_mtime:
+                log_callback(f"   [yellow]File changed, re-running AI[/yellow]")
+            else:
+                log_callback(f"   [dim]Cache expired ({age/60:.1f}m old), re-running AI[/dim]")
+
+    # Cache miss or invalid - run AI
+    log_callback(f"   [grey]🤖 Generating AI name...[/grey]")
+    filename, tags = get_ai_description(img_path, model, log_callback)
+
+    if filename and tags:
+        # Thread-safe cache write
+        entry = {
+            'filename': filename,
+            'tags': tags,
+            'mtime': current_mtime,
+            'cached_at': time.time()
+        }
+        if cache_lock:
+            with cache_lock:
+                cache[cache_key] = entry
+        else:
+            cache[cache_key] = entry
+
+    return filename, tags
+
 def get_ai_image_name(image_path: Path, model_name: str, log_callback: Callable[[str], None] = no_op_logger) -> Optional[Dict[str, Any]]:
     """(V9.2) Generate AI-powered name for an image (for burst PICK files)."""
     try:
@@ -1146,41 +1248,68 @@ def analyze_single_exif(image_path: Path) -> Optional[Dict]:
         return None
 
 def process_single_image(
-    image_path: Path, 
-    destination_base: Path, 
-    model_name: str, 
+    image_path: Path,
+    destination_base: Path,
+    model_name: str,
     rename_log_path: Optional[Path] = None,
-    log_callback: Callable[[str], None] = no_op_logger
+    log_callback: Callable[[str], None] = no_op_logger,
+    preview_mode: bool = False,
+    ai_cache: Optional[Dict[str, Dict]] = None,
+    cache_lock: Optional[threading.Lock] = None,
+    simulated_paths: Optional[set] = None
 ) -> Tuple[Path, bool, str, str]:
-    """(V9.3) Process one image: get AI name/tags, rename, move to temp location."""
+    """
+    (V9.3) Process one image: get AI name/tags, rename, move to temp location.
+
+    New in dry-run feature:
+        preview_mode: If True, simulate operations without moving files
+        ai_cache: Optional cache dict for AI results
+        cache_lock: Optional threading.Lock for thread-safe cache access
+        simulated_paths: Set of paths for collision detection in preview mode
+    """
     try:
         if is_already_ai_named(image_path.name):
             extension = image_path.suffix.lower()
             base_name = image_path.stem
             clean_base = base_name[:-5] if base_name.endswith('_PICK') else base_name
-            new_path = get_unique_filename(clean_base, extension, destination_base)
-            
-            # FIXXER v1.0: Hash-verified move
-            verify_file_move_with_hash(image_path, new_path, log_callback, generate_sidecar=True)
+
+            if preview_mode and simulated_paths is not None:
+                new_path = get_unique_filename_simulated(clean_base, extension, destination_base, simulated_paths)
+                simulated_paths.add(new_path)
+                log_callback(f"   [cyan]WOULD MOVE:[/cyan] {image_path.name} → {new_path.name}")
+            else:
+                new_path = get_unique_filename(clean_base, extension, destination_base)
+                # FIXXER v1.0: Hash-verified move
+                verify_file_move_with_hash(image_path, new_path, log_callback, generate_sidecar=True)
+
             if rename_log_path:
                 write_rename_log(rename_log_path, image_path.name, new_path.name, destination_base)
             description_for_categorization = clean_base.replace('-', ' ')
             return image_path, True, new_path.name, description_for_categorization
-        
-        ai_filename, ai_tags = get_ai_description(image_path, model_name, log_callback)
+
+        # Use cache-aware AI naming
+        ai_filename, ai_tags = get_ai_name_with_cache(
+            image_path, model_name, ai_cache, cache_lock, log_callback
+        )
         if not ai_filename or not ai_tags:
             return image_path, False, "Failed to get valid AI JSON response", ""
-        
+
         description_for_categorization = " ".join(ai_tags)
         clean_name = Path(ai_filename).stem
         extension = image_path.suffix.lower()
-        new_path = get_unique_filename(clean_name, extension, destination_base)
-        
-        # FIXXER v1.0: Hash-verified move
-        verify_file_move_with_hash(image_path, new_path, log_callback, generate_sidecar=True)
+
+        if preview_mode and simulated_paths is not None:
+            new_path = get_unique_filename_simulated(clean_name, extension, destination_base, simulated_paths)
+            simulated_paths.add(new_path)
+            log_callback(f"   [cyan]WOULD MOVE:[/cyan] {image_path.name} → {new_path.name}")
+        else:
+            new_path = get_unique_filename(clean_name, extension, destination_base)
+            # FIXXER v1.0: Hash-verified move
+            verify_file_move_with_hash(image_path, new_path, log_callback, generate_sidecar=True)
+
         if rename_log_path:
             write_rename_log(rename_log_path, image_path.name, new_path.name, destination_base)
-        
+
         return image_path, True, new_path.name, description_for_categorization
     except Exception as e:
         return image_path, False, str(e), ""
@@ -1360,17 +1489,25 @@ Respond with ONLY a single JSON object in this exact format:
 def simple_sort_workflow(
     log_callback: Callable[[str], None] = no_op_logger,
     app_config: Optional[Dict[str, Any]] = None,
-    stop_event: Optional[threading.Event] = None
+    stop_event: Optional[threading.Event] = None,
+    preview_mode: bool = False,
+    ai_cache: Optional[Dict[str, Dict]] = None,
+    cache_lock: Optional[threading.Lock] = None
 ) -> Dict[str, Any]:
     """
     Simple workflow: AI name + organize by keyword into folders.
     No burst detection, no culling - just straightforward naming and sorting.
     Perfect for home users who want a simple "point and organize" experience.
-    
+
     This is the "legacy mode" from the original CLI photosort.py that just:
     1. AI names all images
     2. Groups them into folders by keyword
     That's it. Powerful for the home user who just needs to organize photos.
+
+    New in dry-run feature:
+        preview_mode: If True, simulate operations without moving files
+        ai_cache: Optional cache dict for AI results
+        cache_lock: Optional threading.Lock for thread-safe cache access
     """
     start_time = datetime.now()
     
@@ -1391,18 +1528,22 @@ def simple_sort_workflow(
     if not directory.is_dir():
         log_callback(f"[bold red]✗ FATAL: Source directory not found:[/bold red] {directory}")
         return {}
-    
-    try:
-        chosen_destination.mkdir(parents=True, exist_ok=True)
-    except Exception as e:
-        log_callback(f"[bold red]✗ FATAL: Could not create destination:[/bold red] {e}")
-        return {}
-    
+
+    if not preview_mode:
+        try:
+            chosen_destination.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            log_callback(f"[bold red]✗ FATAL: Could not create destination:[/bold red] {e}")
+            return {}
+
     # Create temp staging area for renamed files
     temp_staging = chosen_destination / "_staging"
-    temp_staging.mkdir(exist_ok=True)
-    
+    if not preview_mode:
+        temp_staging.mkdir(exist_ok=True)
+
     log_callback(f"\n[bold cyan]📁 Simple Sort: AI Naming + Keyword Folders[/bold cyan]")
+    if preview_mode:
+        log_callback(f"   [yellow]MODE: DRY RUN (No files will be moved)[/yellow]")
     log_callback(f"   Source:      {directory}")
     log_callback(f"   Destination: {chosen_destination}")
     log_callback(f"   Model:       {chosen_model}")
@@ -1424,15 +1565,23 @@ def simple_sort_workflow(
     log_callback("\n[bold]🤖 AI Naming Images...[/bold]")
     processed_files = []
     success_count = 0
-    
+
+    # Track simulated paths to prevent collisions in preview
+    simulated_paths = set() if preview_mode else None
+
     for idx, img in enumerate(image_files, 1):
         if stop_event and stop_event.is_set():
             log_callback("\n[yellow]🛑 Workflow stopped by user.[/yellow]")
             return {}
-            
+
         log_callback(f"   [{idx}/{len(image_files)}] {img.name}")
         original_path, success, new_name, description = process_single_image(
-            img, temp_staging, chosen_model, log_callback=log_callback
+            img, temp_staging, chosen_model,
+            log_callback=log_callback,
+            preview_mode=preview_mode,
+            ai_cache=ai_cache,
+            cache_lock=cache_lock,
+            simulated_paths=simulated_paths
         )
         
         if success:
@@ -1457,13 +1606,23 @@ def simple_sort_workflow(
     
     # Organize into keyword folders
     log_callback("\n[bold]📂 Organizing into Keyword Folders...[/bold]")
-    organize_into_folders(processed_files, temp_staging, chosen_destination, log_callback)
-    
-    # Clean up staging directory
-    try:
-        temp_staging.rmdir()
-    except:
-        pass
+    if preview_mode:
+        # In preview mode, simulate organization based on descriptions
+        categories = defaultdict(list)
+        for file_info in processed_files:
+            cat = categorize_description(file_info['description'])
+            categories[cat].append(file_info['new_name'])
+
+        for cat, files in categories.items():
+            log_callback(f"   [dim]Preview: Would move {len(files)} files to[/dim] [cyan]{cat}/[/cyan]")
+    else:
+        organize_into_folders(processed_files, temp_staging, chosen_destination, log_callback)
+
+        # Clean up staging directory
+        try:
+            temp_staging.rmdir()
+        except:
+            pass
     
     duration = datetime.now() - start_time
     log_callback(f"\n[bold green]✓ Simple Sort Complete![/bold green]")
@@ -1483,39 +1642,57 @@ def auto_workflow(
     log_callback: Callable[[str], None] = no_op_logger,
     app_config: Optional[Dict[str, Any]] = None,
     tracker: Optional[StatsTracker] = None,
-    stop_event: Optional[threading.Event] = None
+    stop_event: Optional[threading.Event] = None,
+    preview_mode: bool = False,
+    ai_cache: Optional[Dict[str, Dict]] = None,
+    cache_lock: Optional[threading.Lock] = None
 ) -> Dict[str, Any]:
-    """(V9.3) Complete automated workflow: Stack → Cull → AI-Name → Archive."""
-    
+    """
+    (V9.3) Complete automated workflow: Stack → Cull → AI-Name → Archive.
+
+    New in dry-run feature:
+        preview_mode: If True, simulate operations without moving files
+        ai_cache: Optional cache dict for AI results (model-aware)
+        cache_lock: Optional threading.Lock for thread-safe cache access
+    """
+
+    # --- PREVIEW MODE BANNER ---
+    if preview_mode:
+        log_callback("\n[bold yellow]═══ DRY RUN MODE ═══[/bold yellow]")
+        log_callback("[dim]No files will be moved. Preview only.[/dim]\n")
+
     # --- 1. CONFIGURATION ---
     if app_config is None:
         app_config = load_app_config()
-    
+
     # The TUI now handles source/dest selection. Get them from config.
     source_str = app_config.get('last_source_path')
     dest_str = app_config.get('last_destination_path')
-    
+
     if not source_str or not dest_str:
         log_callback("[bold red]✗ FATAL: Source or Destination not set in config.[/bold red]")
         return {}
-        
+
     directory = Path(source_str)
     chosen_destination = Path(dest_str)
-    
+
     if not directory.is_dir():
         log_callback(f"[bold red]✗ FATAL: Source directory not found:[/bold red] {directory}")
         return {}
-        
-    try:
-        chosen_destination.mkdir(parents=True, exist_ok=True)
-    except Exception as e:
-        log_callback(f"[bold red]✗ FATAL: Could not create destination:[/bold red] {e}")
-        return {}
-        
+
+    if not preview_mode:
+        try:
+            chosen_destination.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            log_callback(f"[bold red]✗ FATAL: Could not create destination:[/bold red] {e}")
+            return {}
+
     chosen_model = app_config['default_model']
     log_callback(f"   Source:      {directory}")
     log_callback(f"   Destination: {chosen_destination}")
     log_callback(f"   Model:       {chosen_model}")
+    if preview_mode:
+        log_callback(f"   [yellow]Mode:        DRY RUN (preview only)[/yellow]")
     
     # Check for critical libs
     if not V5_LIBS_AVAILABLE or not V6_CULL_LIBS_AVAILABLE or not V6_4_EXIF_LIBS_AVAILABLE:
@@ -1545,36 +1722,59 @@ def auto_workflow(
     # --- 3. GROUP BURSTS ---
     if stop_event and stop_event.is_set(): return {}
     log_callback("\n[bold]Step 3/5: Stacking burst shots (with AI naming)...[/bold]")
+    if preview_mode:
+        log_callback("[dim yellow]PREVIEW MODE: No files will be moved[/dim yellow]")
     # v1.1: Auto workflow ALWAYS does AI naming, regardless of burst_auto_name config
     auto_config = app_config.copy()
     auto_config['burst_auto_name'] = True
-    group_bursts_in_directory(log_callback, auto_config, directory_override=directory, tracker=tracker, stop_event=stop_event)
+
+    # [FIX] Capture returned picks (dry-run feature)
+    burst_picks = group_bursts_in_directory(log_callback, auto_config, directory_override=directory, tracker=tracker, stop_event=stop_event, preview_mode=preview_mode, ai_cache=ai_cache, cache_lock=cache_lock)
 
     # --- 4. CULL SINGLES ---
     if stop_event and stop_event.is_set(): return {}
     log_callback("\n[bold]Step 4/5: Culling single shots...[/bold]")
-    cull_images_in_directory(log_callback, app_config, directory_override=directory, tracker=tracker, stop_event=stop_event)
+    if preview_mode:
+        log_callback("[dim yellow]PREVIEW MODE: No files will be moved[/dim yellow]")
+
+    # [FIX] Capture returned Tier A files (dry-run feature)
+    tier_a_files = cull_images_in_directory(log_callback, app_config, directory_override=directory, tracker=tracker, stop_event=stop_event, preview_mode=preview_mode)
     tier_a_dir = directory / TIER_A_FOLDER
     
     # --- 5. FIND & ARCHIVE HEROES ---
     log_callback("\n[bold]Step 5/5: Finding and archiving 'hero' files...[/bold]")
-    
+
     hero_files = []
-    if tier_a_dir.is_dir():
-        for f in tier_a_dir.iterdir():
-            if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS:
-                hero_files.append(f)
-    
-    burst_parent = directory / "_Bursts"
-    burst_folders = []
-    if burst_parent.exists() and burst_parent.is_dir():
-        burst_folders = [f for f in burst_parent.iterdir() if f.is_dir()]
-    
-    for burst_folder in burst_folders:
-        if burst_folder.is_dir():
-            for f in burst_folder.iterdir():
-                if f.is_file() and (f.name.startswith(BEST_PICK_PREFIX) or is_already_ai_named(f.name)):
+
+    if preview_mode:
+        # [CRITICAL FIX] In Dry Run, folders don't exist. Use the returned lists!
+        # Combine lists and remove duplicates (if any file appeared in both)
+        if burst_picks:
+            hero_files.extend(burst_picks)
+        if tier_a_files:
+            # Only add Tier A files that aren't already in burst picks
+            picks_set = set(burst_picks) if burst_picks else set()
+            for f in tier_a_files:
+                if f not in picks_set:
                     hero_files.append(f)
+        log_callback(f"   [dim]Preview: Found {len(hero_files)} hero files from returned lists[/dim]")
+    else:
+        # [REAL RUN] Use existing filesystem scanning logic
+        if tier_a_dir.is_dir():
+            for f in tier_a_dir.iterdir():
+                if f.is_file() and f.suffix.lower() in SUPPORTED_EXTENSIONS:
+                    hero_files.append(f)
+
+        burst_parent = directory / "_Bursts"
+        burst_folders = []
+        if burst_parent.exists() and burst_parent.is_dir():
+            burst_folders = [f for f in burst_parent.iterdir() if f.is_dir()]
+
+        for burst_folder in burst_folders:
+            if burst_folder.is_dir():
+                for f in burst_folder.iterdir():
+                    if f.is_file() and (f.name.startswith(BEST_PICK_PREFIX) or is_already_ai_named(f.name)):
+                        hero_files.append(f)
 
     if not hero_files:
         log_callback(f"\n   No '{TIER_A_FOLDER}' or '_PICK_' files found. Nothing to archive.")
@@ -1593,22 +1793,41 @@ def auto_workflow(
         tracker.update('heroes', len(hero_files))
     
     results = {"success": [], "failed": []}
-    rename_log_path = chosen_destination / f"_ai_rename_log_{SESSION_TIMESTAMP}.txt"
-    initialize_rename_log(rename_log_path)
-    
+
+    # [LOGIC PATCH] Only create the physical rename log if this is a REAL run
+    if preview_mode:
+        rename_log_path = None
+    else:
+        rename_log_path = chosen_destination / f"_ai_rename_log_{SESSION_TIMESTAMP}.txt"
+        initialize_rename_log(rename_log_path)
+
+    # Preview mode: track simulated paths for collision detection
+    simulated_paths = set() if preview_mode else None
+
     log_callback(f"\n   [grey]Archiving {len(hero_files)} files...[/grey]")
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         future_to_file = {
-            executor.submit(process_single_image, img_path, chosen_destination, chosen_model, rename_log_path, log_callback): img_path 
+            executor.submit(
+                process_single_image,
+                img_path,
+                chosen_destination,
+                chosen_model,
+                rename_log_path,
+                log_callback,
+                preview_mode,
+                ai_cache,
+                cache_lock,
+                simulated_paths
+            ): img_path
             for img_path in hero_files
         }
-        
+
         for i, future in enumerate(as_completed(future_to_file)):
             if stop_event and stop_event.is_set():
                 log_callback("\n[yellow]🛑 Workflow stopped by user.[/yellow]")
                 executor.shutdown(wait=False, cancel_futures=True)
                 return {}
-                
+
             log_callback(f"   [grey]Processing item {i+1}/{len(hero_files)}...[/grey]")
             original, success, message, description = future.result()
             if success:
@@ -1638,57 +1857,77 @@ def auto_workflow(
         for item in results["success"]:
             cat = categorize_description(item["description"])
             categories[cat] = categories.get(cat, 0) + 1
-        
-        # (V10.7) Pass sample images for vision-based session naming
-        # Select up to 3 diverse hero files as samples
-        # FIX: Use the NEW paths from results["success"] because hero_files (source) 
-        # have already been moved!
-        sample_images = []
-        for item in results["success"]:
-            if len(sample_images) >= 3:
-                break
-            
-            # Construct the path to the file in the DESTINATION
-            new_path = chosen_destination / item["new_name"]
-            
-            # Quick test: try to encode it
-            if new_path.exists():
-                test_encode = encode_image(new_path, no_op_logger)  # Silent test
-                if test_encode:
-                    sample_images.append(new_path)
-        
-        if not sample_images and results["success"]:
-            # If no images could be encoded, just pass the paths anyway
-            # The generate_ai_session_name will fall back to text-only
-            for item in results["success"][:3]:
-                new_path = chosen_destination / item["new_name"]
-                if new_path.exists():
-                    sample_images.append(new_path)
-            log_callback(f"   [yellow]Warning: Could not encode sample images, using text-only naming[/yellow]")
-        
-        session_name = generate_ai_session_name(categories, chosen_model, log_callback, sample_images)
-        
-        if session_name and len(session_name) > 2 and app_config.get('ai_session_naming', True):
-            dated_folder = f"{SESSION_DATE}_{session_name}"
-            log_callback(f"\n   [bold]🎨 AI Session Name: {dated_folder}[/bold]")
+
+        # In preview mode, skip file organization (files not actually moved)
+        if preview_mode:
+            log_callback(f"\n[dim]Preview: Would organize into {len(categories)} categories:[/dim]")
+            for cat, count in categories.items():
+                log_callback(f"   [dim]• {cat}: {count} files[/dim]")
+            summary["categories"] = len(categories)
+            summary["preview_categories"] = categories
         else:
-            dated_folder = f"{SESSION_DATE}_Session"
-        
-        final_destination = chosen_destination / dated_folder
-        final_destination.mkdir(parents=True, exist_ok=True)
-        session_tracker.set_destination(final_destination)
-        
-        organize_into_folders(results["success"], chosen_destination, final_destination, log_callback)
-        summary["final_destination"] = str(final_destination.name)
-        summary["categories"] = len(categories)
+            # (V10.7) Pass sample images for vision-based session naming
+            # [FIX] Select up to 3 diverse hero files as samples
+            sample_images = []
+            for item in results["success"]:
+                if len(sample_images) >= 3:
+                    break
+
+                # [LOGIC PATCH] In Dry Run, file is at SOURCE. In Real Run, it's at DESTINATION.
+                if preview_mode:
+                    # File is still in source directory
+                    current_path = directory / item["original"]
+                else:
+                    # File has been moved to destination
+                    current_path = chosen_destination / item["new_name"]
+
+                if current_path.exists():
+                    # Quick test: try to encode it to ensure it's readable
+                    test_encode = encode_image(current_path, no_op_logger)
+                    if test_encode:
+                        sample_images.append(current_path)
+
+            if not sample_images and results["success"]:
+                # If no images could be encoded, just pass the paths anyway
+                # The generate_ai_session_name will fall back to text-only
+                for item in results["success"][:3]:
+                    new_path = chosen_destination / item["new_name"]
+                    if new_path.exists():
+                        sample_images.append(new_path)
+                log_callback(f"   [yellow]Warning: Could not encode sample images, using text-only naming[/yellow]")
+
+            session_name = generate_ai_session_name(categories, chosen_model, log_callback, sample_images)
+
+            if session_name and len(session_name) > 2 and app_config.get('ai_session_naming', True):
+                dated_folder = f"{SESSION_DATE}_{session_name}"
+                log_callback(f"\n   [bold]🎨 AI Session Name: {dated_folder}[/bold]")
+            else:
+                dated_folder = f"{SESSION_DATE}_Session"
+
+            final_destination = chosen_destination / dated_folder
+            if not preview_mode:
+                final_destination.mkdir(parents=True, exist_ok=True)
+            session_tracker.set_destination(final_destination)
+
+            organize_into_folders(results["success"], chosen_destination, final_destination, log_callback)
+            summary["final_destination"] = str(final_destination.name)
+            summary["categories"] = len(categories)
 
     # Stop HUD timer
     if tracker:
         tracker.stop_timer()
 
-    log_callback("\n[bold green]🚀 AUTO WORKFLOW COMPLETE[/bold green]")
-    log_callback(f"   Your 'hero' photos are now in: {chosen_destination}")
-    log_callback(f"   Rename log saved: {rename_log_path.name}")
+    # Different completion messages for preview vs real mode
+    if preview_mode:
+        log_callback("\n[bold green]✓ Dry Run Complete[/bold green]")
+        log_callback(f"   [dim]Preview generated {len(results['success'])} AI names[/dim]")
+        if ai_cache:
+            log_callback(f"   [cyan]⚡ Cached {len(ai_cache)} AI results for instant execution[/cyan]")
+    else:
+        log_callback("\n[bold green]🚀 AUTO WORKFLOW COMPLETE[/bold green]")
+        log_callback(f"   Your 'hero' photos are now in: {chosen_destination}")
+        if rename_log_path:
+            log_callback(f"   Rename log saved: {rename_log_path.name}")
 
     return summary
 
@@ -1700,14 +1939,23 @@ def group_bursts_in_directory(
     simulated: bool = False,
     directory_override: Optional[Path] = None,
     tracker: Optional[StatsTracker] = None,
-    stop_event: Optional[threading.Event] = None
-) -> None:
+    stop_event: Optional[threading.Event] = None,
+    preview_mode: bool = False,
+    ai_cache: Optional[Dict[str, Dict]] = None,
+    cache_lock: Optional[threading.Lock] = None
+) -> List[Path]:
     """
-    (V1.1) Finds and stacks burst groups, optionally AI-naming the best pick.
+    (V1.2) Finds and stacks burst groups, optionally AI-naming the best pick.
+
+    Returns:
+        List of 'Pick' files (best images from each burst group)
 
     By default (burst_auto_name=false), uses fast numeric naming.
     Set burst_auto_name=true in config to enable AI naming (slower).
     Auto workflow always uses AI naming regardless of this setting.
+
+    New in dry-run feature:
+        preview_mode: If True, simulate operations without moving files
     """
     
     if app_config is None: app_config = load_app_config()
@@ -1780,14 +2028,17 @@ def group_bursts_in_directory(
 
     if not all_burst_groups:
         log_callback("   No burst groups found. All images are unique!")
-        return
+        return []
         
     log_callback(f"   [green]✓ Found {len(all_burst_groups)} burst groups.[/green] Analyzing for best pick...")
-    
+
     # Update HUD: Bursts count
     if tracker:
         tracker.update('bursts', len(all_burst_groups))
-    
+
+    # Track burst picks for return value (dry-run feature)
+    burst_picks: List[Path] = []
+
     best_picks: Dict[int, Tuple[Path, float]] = {}
     for i, group in enumerate(all_burst_groups):
         best_sharpness = -1.0
@@ -1807,14 +2058,19 @@ def group_bursts_in_directory(
     bursts_parent = directory / "_Bursts" if use_parent_folder else directory
     if use_parent_folder:
         log_callback(f"   Organizing burst groups into: {bursts_parent.name}/")
-        bursts_parent.mkdir(exist_ok=True)
+        if not preview_mode:
+            bursts_parent.mkdir(exist_ok=True)
     
     # v1.1: Check if AI naming is enabled for burst workflow
     burst_auto_name = app_config.get('burst_auto_name', False)
 
     if burst_auto_name:
-        rename_log_path = directory / f"_ai_rename_log_{SESSION_TIMESTAMP}.txt"
-        initialize_rename_log(rename_log_path)
+        # [LOGIC PATCH] Only create the physical rename log if this is a REAL run
+        if preview_mode:
+            rename_log_path = None
+        else:
+            rename_log_path = directory / f"_ai_rename_log_{SESSION_TIMESTAMP}.txt"
+            initialize_rename_log(rename_log_path)
         ai_model = app_config.get('default_model', DEFAULT_MODEL_NAME)
         log_callback("   [grey]AI naming enabled for bursts...[/grey]")
 
@@ -1822,13 +2078,20 @@ def group_bursts_in_directory(
         winner_data = best_picks.get(i)
         sample_image = winner_data[0] if winner_data else group[0]
 
+        # Add the winner to our return list (for dry-run feature)
+        burst_picks.append(sample_image)
+
         # Only run AI naming if enabled
         if burst_auto_name:
-            log_callback(f"   [grey]Burst {i+1}/{len(all_burst_groups)}: Generating AI name...[/grey]")
-            ai_result = get_ai_image_name(sample_image, ai_model, log_callback)
+            log_callback(f"   [grey]Burst {i+1}/{len(all_burst_groups)}: Naming...[/grey]")
 
-            if ai_result and ai_result.get('filename'):
-                base_name = ai_result['filename']
+            # Use cache-aware AI naming (for dry-run feature)
+            ai_filename, ai_tags = get_ai_name_with_cache(
+                sample_image, ai_model, ai_cache, cache_lock, log_callback
+            )
+
+            if ai_filename and ai_tags:
+                base_name = Path(ai_filename).stem  # Extract base name without extension
                 folder_name = f"{base_name}_burst"
                 log_callback(f"     [green]✓ AI named:[/green] {base_name}")
             else:
@@ -1851,7 +2114,8 @@ def group_bursts_in_directory(
                 counter += 1
         
         log_callback(f"     [grey]📁 Moving {len(group)} files to {folder_path.relative_to(directory)}/...[/grey]")
-        folder_path.mkdir(parents=True, exist_ok=True)
+        if not preview_mode:
+            folder_path.mkdir(parents=True, exist_ok=True)
         
         alternate_counter = 1
         for file_path in group:
@@ -1864,15 +2128,20 @@ def group_bursts_in_directory(
             
             new_file_path = folder_path / new_name
             try:
-                # FIXXER v1.0: Hash-verified move
-                verify_file_move_with_hash(file_path, new_file_path, log_callback, generate_sidecar=True)
+                if preview_mode:
+                    log_callback(f"     [cyan]WOULD MOVE:[/cyan] {file_path.name} → {folder_path.name}/{new_name}")
+                else:
+                    # FIXXER v1.0: Hash-verified move
+                    verify_file_move_with_hash(file_path, new_file_path, log_callback, generate_sidecar=True)
                 if burst_auto_name:
                     write_rename_log(rename_log_path, file_path.name, new_name, folder_path)
             except Exception as e:
                 log_callback(f"     [red]FAILED to move {file_path.name}: {e}[/red]")
 
-    if burst_auto_name:
+    if burst_auto_name and rename_log_path:
         log_callback(f"   Rename log saved: {rename_log_path.name}")
+
+    return burst_picks  # Return the winners for dry-run feature
 
 # --- Cull Workflow ---
 
@@ -1882,9 +2151,18 @@ def cull_images_in_directory(
     simulated: bool = False,
     directory_override: Optional[Path] = None,
     tracker: Optional[StatsTracker] = None,
-    stop_event: Optional[threading.Event] = None
-) -> None:
-    """(V9.3) Finds and groups images by technical quality using Tier A/B/C naming."""
+    stop_event: Optional[threading.Event] = None,
+    preview_mode: bool = False
+) -> List[Path]:
+    """
+    (V9.4) Finds and groups images by technical quality using Tier A/B/C naming.
+
+    Returns:
+        List of 'Tier A' files (best quality images)
+
+    New in dry-run feature:
+        preview_mode: If True, simulate operations without moving files
+    """
     
     if app_config is None: app_config = load_app_config()
     
@@ -1972,17 +2250,23 @@ def cull_images_in_directory(
         if not paths: continue
         folder_path = folder_map[tier]
         log_callback(f"   [grey]Moving {len(paths)} files to {folder_path.name}/...[/grey]")
-        folder_path.mkdir(exist_ok=True)
+        if not preview_mode:
+            folder_path.mkdir(exist_ok=True)
             
         for file_path in paths:
             new_file_path = folder_path / file_path.name
             try:
-                # FIXXER v1.0: Hash-verified move
-                verify_file_move_with_hash(file_path, new_file_path, log_callback, generate_sidecar=True)
+                if preview_mode:
+                    log_callback(f"     [cyan]WOULD MOVE:[/cyan] {file_path.name} → {folder_path.name}/{file_path.name}")
+                else:
+                    # FIXXER v1.0: Hash-verified move
+                    verify_file_move_with_hash(file_path, new_file_path, log_callback, generate_sidecar=True)
             except Exception as e:
                 log_callback(f"     [red]FAILED to move {file_path.name}: {e}[/red]")
 
     log_callback("   Culling complete!")
+
+    return tiers["Tier_A"]  # Return Tier A files for dry-run feature
 
 def process_image_for_culling(image_path: Path, log_callback: Callable[[str], None] = no_op_logger) -> Tuple[Path, Optional[Dict[str, float]]]:
     """Thread-pool worker: Gets bytes and runs analysis engine"""

@@ -366,6 +366,88 @@ class DirectorySelectScreen(ModalScreen[Optional[Path]]):
         self.dismiss(None)
 
 
+class DryRunSelectScreen(ModalScreen[Optional[str]]):
+    """Modal screen for selecting which workflow to preview."""
+
+    CSS = """
+    DryRunSelectScreen {
+        align: center middle;
+    }
+
+    #dryrun-dialog {
+        width: 50;
+        height: auto;
+        border: thick $primary;
+        background: $surface;
+        padding: 1;
+    }
+
+    #dryrun-dialog Label {
+        text-align: center;
+        margin-bottom: 1;
+    }
+
+    #dryrun-dialog Button {
+        width: 100%;
+        margin: 0 0 1 0;
+    }
+    """
+
+    def compose(self) -> ComposeResult:
+        with Container(id="dryrun-dialog"):
+            yield Label("[bold yellow]Dry Run - Select Workflow[/bold yellow]")
+            yield Label("[dim]Preview operations without moving files[/dim]")
+            yield Button("[A] Auto Workflow", id="dry-auto", variant="primary")
+            yield Button("[B] Burst Detection", id="dry-burst", variant="default")
+            yield Button("[C] Quality Culling", id="dry-cull", variant="default")
+            yield Button("Cancel", id="dry-cancel", variant="error")
+
+    @on(Button.Pressed, "#dry-auto")
+    def on_auto(self) -> None:
+        self.dismiss("auto")
+
+    @on(Button.Pressed, "#dry-burst")
+    def on_burst(self) -> None:
+        self.dismiss("burst")
+
+    @on(Button.Pressed, "#dry-cull")
+    def on_cull(self) -> None:
+        self.dismiss("cull")
+
+    @on(Button.Pressed, "#dry-cancel")
+    def on_cancel(self) -> None:
+        self.dismiss(None)
+
+
+# ==============================================================================
+# Widget Components
+# ==============================================================================
+
+class PreviewStatusWidget(Container):
+    """Shows cache status with action buttons after dry run."""
+
+    def compose(self) -> ComposeResult:
+        with Horizontal(id="preview-status-bar"):
+            yield Static("[bold green]✓[/bold green] Preview cached ([cyan]5 AI names[/cyan] ready)", id="preview-status-text")
+            yield Button("Execute Now", id="btn-execute-cached", variant="primary")
+            yield Button("Forget & Redo", id="btn-forget-preview", variant="warning")
+
+    def update_status(self, count: int) -> None:
+        """Update the status text with cache count."""
+        text = self.query_one("#preview-status-text", Static)
+        text.update(f"[bold green]✓[/bold green] Preview cached ([cyan]{count} AI names[/cyan] ready)")
+
+    def show_widget(self) -> None:
+        """Show the widget."""
+        self.display = True
+        self.refresh(layout=True)
+
+    def hide_widget(self) -> None:
+        """Hide the widget."""
+        self.display = False
+        self.refresh(layout=True)
+
+
 # ==============================================================================
 # Widget Components
 # ==============================================================================
@@ -649,6 +731,7 @@ class FixxerTUI(App):
         Binding("ctrl+c", "quit", "Quit", show=False),
         # Workflow Shortcuts
         Binding("a", "run_auto", "Auto (a)", show=False),
+        Binding("d", "run_dryrun", "Dry Run (d)", show=False),
         Binding("b", "run_bursts", "Bursts (b)", show=False),
         Binding("c", "run_cull", "Cull (c)", show=False),
         Binding("s", "run_stats", "Stats (s)", show=False),
@@ -692,18 +775,18 @@ class FixxerTUI(App):
         self.current_thread: Optional[threading.Thread] = None
         self.workflow_active = False
         self.stop_event = threading.Event()
-        
+
         self.status_lock = threading.Lock()
         self.current_status = "Ready"
         self.current_stats = {}
-        
+
         # Progress tracking (with spinner instead of bar)
         self.workflow_start_time: Optional[float] = None
         self.phrase_timer: Optional[Timer] = None
         self.timer_update_timer: Optional[Timer] = None
         self.spinner_timer: Optional[Timer] = None
         self.spinner_frame_index = 0
-        
+
         self.log_panel: Optional[LogPanel] = None
         self.file_browser: Optional[DirectoryTree] = None
         self.status_bar: Optional[Static] = None
@@ -712,6 +795,13 @@ class FixxerTUI(App):
         self.progress_timer_display: Optional[Static] = None
         self.progress_container: Optional[Container] = None  # For compact/expanded state
         self.milestone_hud: Optional[MilestoneHUD] = None  # HUD reference (Pro Mode only)
+
+        # Dry-run preview feature (NEW)
+        self.ai_cache: Dict[str, Dict] = {}  # Model-aware AI result cache
+        self.cache_lock = threading.Lock()  # Thread-safe cache access
+        self.preview_log_buffer: list = []  # Preview log accumulator
+        self.preview_log_path: Optional[Path] = None  # Current preview log file
+        self.preview_status: Optional[PreviewStatusWidget] = None  # Preview status widget
     
     def get_fixxer_logo(self) -> str:
         """UI: Returns the FIXXER logo - adapts to pro_mode."""
@@ -775,10 +865,15 @@ class FixxerTUI(App):
                         yield CPUMonitor()
                 # Pro Mode: HUD is now in header, no system monitor here
                 # =====================================
-                
+
                 self.status_bar = Static(id="status-bar")
                 yield self.status_bar
-                
+
+                # Preview status widget (dry-run feature) - hidden by default
+                self.preview_status = PreviewStatusWidget(id="preview-status")
+                self.preview_status.display = False
+                yield self.preview_status
+
                 # Progress indicator - compact when idle, expands when active
                 self.progress_container = Container(id="progress-container")
                 with self.progress_container:
@@ -805,8 +900,9 @@ class FixxerTUI(App):
                 with Horizontal(classes="btn-group"):
                     yield Button("[1] Source", id="btn-source", variant="warning", classes="path-btn", tooltip="Keyboard: 1")
                     yield Button("[2] Dest", id="btn-dest", variant="warning", classes="path-btn", tooltip="Keyboard: 2")
+                    yield Button("[D] Dry Run", id="btn-dryrun", variant="default", classes="workflow-btn", tooltip="Keyboard: D - Preview without moving files")
                     yield Button("[M] Model", id="btn-model", variant="default", classes="path-btn", tooltip="Keyboard: M")
-                
+
                 # Group 2: Tactical
                 with Horizontal(classes="btn-group"):
                     yield Button("[A] Auto", id="btn-auto", variant="primary", classes="workflow-btn", tooltip="Keyboard: A")
@@ -1197,6 +1293,10 @@ class FixxerTUI(App):
     def action_run_auto(self) -> None:
         self.query_one("#btn-auto", Button).press()
 
+    def action_run_dryrun(self) -> None:
+        self.write_to_log("[bold magenta]🔑 'D' key pressed - triggering dry run button...[/bold magenta]")
+        self.query_one("#btn-dryrun", Button).press()
+
     def action_run_bursts(self) -> None:
         self.query_one("#btn-burst", Button).press()
 
@@ -1344,15 +1444,31 @@ class FixxerTUI(App):
         # Reset HUD before new run
         if self.milestone_hud:
             self.milestone_hud.reset()
-        
+
+        # Special handling for dry run - don't disable buttons yet (modal needs them)
+        if event.button.id == "btn-dryrun":
+            self.write_to_log("[bold yellow]🔍 DRY RUN button pressed - opening workflow selector...[/bold yellow]")
+
+            # Show modal to select which workflow to preview
+            def handle_workflow_selection(workflow: Optional[str]):
+                if workflow:
+                    self.write_to_log(f"[bold yellow]📋 PREVIEW MODE selected: {workflow.upper()}[/bold yellow]")
+                    self.run_workflow_in_preview_mode(workflow)
+                else:
+                    self.write_to_log("[dim]Dry run cancelled[/dim]")
+
+            self.push_screen(DryRunSelectScreen(), handle_workflow_selection)
+            return  # Exit early - don't disable buttons
+
+        # For all other workflows, disable buttons before starting
         self.toggle_workflow_buttons(disabled=True)
-        
+
         if event.button.id == "btn-auto":
             self.write_to_log("=" * 50)
             self.write_to_log("[bold cyan]Starting AUTO WORKFLOW[/bold cyan]")
             self.start_progress_tracking()
             self.run_in_thread(self.run_auto_workflow_thread, "AutoWorkflow")
-        
+
         elif event.button.id == "btn-burst":
             self.write_to_log("=" * 50)
             self.write_to_log("[bold blue]Starting BURST GROUPING[/bold blue]")
@@ -1383,16 +1499,54 @@ class FixxerTUI(App):
         if self.workflow_active:
             self.write_to_log("[red]A workflow is already running![/red]")
             return
-            
+
         if not self.check_paths_configured():
             return
-            
+
         self.toggle_workflow_buttons(disabled=True)
         self.write_to_log("=" * 50)
         self.write_to_log("[bold green]Starting EASY ARCHIVE[/bold green]")
         self.write_to_log("[dim]Simple AI naming + keyword folder organization[/dim]")
         self.start_progress_tracking()
         self.run_in_thread(self.run_easy_workflow_thread, "EasyWorkflow")
+
+    @on(Button.Pressed, "#btn-execute-cached")
+    def handle_execute_cached(self, event: Button.Pressed) -> None:
+        """Execute auto workflow using cached AI names from preview."""
+        if self.workflow_active:
+            self.write_to_log("[red]A workflow is already running![/red]")
+            return
+
+        if not self.check_paths_configured():
+            return
+
+        # Log cache usage
+        cache_count = len(self.ai_cache)
+        self.write_to_log("=" * 50)
+        self.write_to_log(f"[cyan]⚡ Executing with {cache_count} cached AI names...[/cyan]")
+
+        # Debug: Show cache keys
+        if self.ai_cache:
+            self.write_to_log("[dim]Debug: Cache keys:[/dim]")
+            for key in list(self.ai_cache.keys())[:3]:  # Show first 3
+                self.write_to_log(f"[dim]  - {key}[/dim]")
+
+        self.toggle_workflow_buttons(disabled=True)
+        self.start_progress_tracking()
+        self.run_in_thread(self.run_auto_workflow_thread, "AutoWorkflow")
+
+    @on(Button.Pressed, "#btn-forget-preview")
+    def handle_forget_preview(self, event: Button.Pressed) -> None:
+        """Clear cache and hide preview status widget."""
+        count = len(self.ai_cache)
+        with self.cache_lock:
+            self.ai_cache.clear()
+
+        if self.preview_status:
+            self.preview_status.hide_widget()
+
+        self.write_to_log(f"[yellow]✓ Forgot {count} preview names[/yellow]")
+        self.write_to_log("[dim]Next run will generate fresh AI names[/dim]")
     
     def check_paths_configured(self) -> bool:
         if not self.app_config.get('last_source_path') or not Path(self.app_config['last_source_path']).is_dir():
@@ -1426,25 +1580,112 @@ class FixxerTUI(App):
     def run_in_thread(self, target, name: str) -> None:
         self.current_thread = threading.Thread(target=target, name=name, daemon=True)
         self.current_thread.start()
-    
+
+    # --- Dry Run / Preview Mode Methods ---
+
+    def start_preview_logging(self) -> Path:
+        """Initialize preview log file for dry run."""
+        log_dir = Path.home() / ".fixxer" / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        log_path = log_dir / f"preview_{timestamp}.txt"
+
+        # Write header
+        with open(log_path, 'w') as f:
+            f.write("FIXXER DRY RUN LOG\n")
+            f.write(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+            f.write(f"Source: {self.app_config.get('last_source_path', 'N/A')}\n")
+            f.write(f"Destination: {self.app_config.get('last_destination_path', 'N/A')}\n")
+            f.write(f"Model: {self.app_config.get('default_model', 'N/A')}\n")
+            f.write("=" * 70 + "\n\n")
+
+        self.preview_log_path = log_path
+        self.preview_log_buffer = []
+        return log_path
+
+    def write_to_preview_log(self, message: str) -> None:
+        """Write to both TUI and preview log file."""
+        self.write_to_log(message)
+        if self.preview_log_path:
+            self.preview_log_buffer.append(message)
+
+    def finalize_preview_log(self) -> None:
+        """Flush preview log to file."""
+        if not self.preview_log_path or not self.preview_log_buffer:
+            return
+
+        import re
+
+        # Strip Rich markup
+        clean_buffer = []
+        for line in self.preview_log_buffer:
+            clean_line = re.sub(r'\[/?[a-z]+[^\]]*\]', '', line)
+            clean_buffer.append(clean_line)
+
+        # Append to file
+        with open(self.preview_log_path, 'a') as f:
+            f.write('\n'.join(clean_buffer))
+            f.write('\n\n' + '=' * 70 + '\n')
+            f.write(f"Preview completed at {datetime.now().strftime('%H:%M:%S')}\n")
+
+        self.write_to_log(f"\n[dim]📄 Preview log saved: {self.preview_log_path.name}[/dim]")
+
+        self.preview_log_buffer = []
+        self.preview_log_path = None
+
+    def run_workflow_in_preview_mode(self, workflow: str) -> None:
+        """Execute selected workflow in preview mode."""
+        if self.workflow_active:
+            self.write_to_log("[red]A workflow is already running![/red]")
+            return
+
+        if not self.check_paths_configured():
+            return
+
+        self.toggle_workflow_buttons(disabled=True)
+        self.write_to_log("=" * 50)
+        self.write_to_log("[bold yellow]🚫 PREVIEW MODE ENABLED 🚫[/bold yellow]")
+        self.write_to_log(f"[bold yellow]Starting DRY RUN: {workflow.upper()}[/bold yellow]")
+        self.write_to_log("[dim yellow]No files will be moved - preview only[/dim yellow]")
+        self.write_to_log("=" * 50)
+        self.start_progress_tracking()
+
+        if workflow == "auto":
+            self.run_in_thread(self.run_dryrun_auto_thread, "DryRunAuto")
+        elif workflow == "burst":
+            self.run_in_thread(self.run_dryrun_burst_thread, "DryRunBurst")
+        elif workflow == "cull":
+            self.run_in_thread(self.run_dryrun_cull_thread, "DryRunCull")
+
     # --- Workflow Thread Targets ---
     
     def run_auto_workflow_thread(self) -> None:
         try:
             self.update_status("🚀 Running Auto...", {})
-            
+
             # === CREATE STATS TRACKER WITH CALLBACK ===
             from fixxer_engine import StatsTracker
             tracker = StatsTracker(callback=self.on_stats_update)
             # ==========================================
-            
+
             self.stop_event.clear()
             result = auto_workflow(
                 log_callback=self.write_to_log,
                 app_config=self.app_config,
                 tracker=tracker,
-                stop_event=self.stop_event
+                stop_event=self.stop_event,
+                preview_mode=False,
+                ai_cache=self.ai_cache,
+                cache_lock=self.cache_lock
             )
+
+            # Clear cache and hide widget after successful execution
+            with self.cache_lock:
+                self.ai_cache.clear()
+            if self.preview_status:
+                self.call_from_thread(self.preview_status.hide_widget)
+
             self.write_to_log("[bold green]✓ Auto workflow completed![/bold green]")
             self.update_status("✅ Auto Complete", result if isinstance(result, dict) else {})
         except Exception as e:
@@ -1594,7 +1835,10 @@ class FixxerTUI(App):
             result = simple_sort_workflow(
                 log_callback=self.write_to_log,
                 app_config=self.app_config,
-                stop_event=self.stop_event
+                stop_event=self.stop_event,
+                preview_mode=False,
+                ai_cache=self.ai_cache,
+                cache_lock=self.cache_lock
             )
             self.write_to_log("[bold green]✓ Easy Archive complete![/bold green]")
             self.update_status("✅ Archive Complete", result if isinstance(result, dict) else {})
@@ -1603,7 +1847,117 @@ class FixxerTUI(App):
             self.update_status("❌ Error", {})
         finally:
             self.call_from_thread(self.on_workflow_complete)
-    
+
+    # --- Dry Run / Preview Workflow Threads ---
+
+    def run_dryrun_auto_thread(self) -> None:
+        """Dry run auto workflow with persistent logging."""
+        try:
+            # Start logging
+            log_path = self.start_preview_logging()
+
+            from fixxer_engine import StatsTracker
+            tracker = StatsTracker(callback=self.on_stats_update)
+
+            self.stop_event.clear()
+            result = auto_workflow(
+                log_callback=self.write_to_preview_log,
+                app_config=self.app_config,
+                tracker=tracker,
+                stop_event=self.stop_event,
+                preview_mode=True,
+                ai_cache=self.ai_cache,
+                cache_lock=self.cache_lock
+            )
+
+            # Finalize log
+            self.finalize_preview_log()
+
+            # Show cache status
+            cache_count = len(self.ai_cache)
+            self.write_to_log(f"[dim]Debug: Cache has {cache_count} entries[/dim]")
+
+            if self.ai_cache:
+                if self.preview_status:
+                    self.write_to_log("[dim]Debug: Showing preview status widget...[/dim]")
+                    self.call_from_thread(self.preview_status.update_status, cache_count)
+                    self.call_from_thread(self.preview_status.show_widget)
+                else:
+                    self.write_to_log("[dim]Debug: preview_status is None[/dim]")
+            else:
+                self.write_to_log("[dim]Debug: Cache is empty, not showing widget[/dim]")
+
+            self.write_to_log("[bold green]✓ Dry run complete![/bold green]")
+            self.update_status("✅ Preview Complete", result if isinstance(result, dict) else {})
+
+        except Exception as e:
+            self.write_to_log(f"[bold red]✗ Dry run failed: {e}[/bold red]")
+            self.finalize_preview_log()
+            self.update_status("❌ Error", {})
+
+        finally:
+            self.call_from_thread(self.on_workflow_complete)
+
+    def run_dryrun_burst_thread(self) -> None:
+        """Dry run burst workflow with persistent logging."""
+        try:
+            log_path = self.start_preview_logging()
+
+            from fixxer_engine import StatsTracker
+            tracker = StatsTracker(callback=self.on_stats_update)
+
+            self.stop_event.clear()
+            group_bursts_in_directory(
+                log_callback=self.write_to_preview_log,
+                app_config=self.app_config,
+                tracker=tracker,
+                stop_event=self.stop_event,
+                preview_mode=True,
+                ai_cache=self.ai_cache,
+                cache_lock=self.cache_lock
+            )
+
+            self.finalize_preview_log()
+            self.write_to_log("[bold green]✓ Dry run burst complete![/bold green]")
+            self.update_status("✅ Preview Complete", {})
+
+        except Exception as e:
+            self.write_to_log(f"[bold red]✗ Dry run burst failed: {e}[/bold red]")
+            self.finalize_preview_log()
+            self.update_status("❌ Error", {})
+
+        finally:
+            self.call_from_thread(self.on_workflow_complete)
+
+    def run_dryrun_cull_thread(self) -> None:
+        """Dry run cull workflow with persistent logging."""
+        try:
+            log_path = self.start_preview_logging()
+
+            from fixxer_engine import StatsTracker
+            tracker = StatsTracker(callback=self.on_stats_update)
+
+            self.stop_event.clear()
+            cull_images_in_directory(
+                log_callback=self.write_to_preview_log,
+                app_config=self.app_config,
+                tracker=tracker,
+                stop_event=self.stop_event,
+                preview_mode=True
+            )
+
+            self.finalize_preview_log()
+            self.write_to_log("[bold green]✓ Dry run cull complete![/bold green]")
+            self.update_status("✅ Preview Complete", {})
+
+        except Exception as e:
+            self.write_to_log(f"[bold red]✗ Dry run cull failed: {e}[/bold red]")
+            self.finalize_preview_log()
+            self.update_status("❌ Error", {})
+
+        finally:
+            self.call_from_thread(self.on_workflow_complete)
+
     def run_refresh_config_thread(self) -> None:
         try:
             self.update_status("🔄 Refreshing Config...", {})

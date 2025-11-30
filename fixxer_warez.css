@@ -344,3 +344,123 @@ DirectoryTree {
     background: $surface;
     color: $primary;
 }
+
+/* ==============================================================================
+ * MODAL & DRY RUN STYLING (Warez Edition)
+ * ============================================================================== */
+
+/* Dark overlay behind the modal */
+DryRunSelectScreen {
+    background: rgba(0, 0, 0, 0.85);
+    align: center middle;
+}
+
+/* The modal box itself */
+#dryrun-dialog {
+    background: #000000;
+    border: solid #ffffff !important; /* Stark white border for Warez look */
+    width: 50;
+    height: auto;
+    padding: 1 2;
+}
+
+/* Title text inside the modal */
+#dryrun-dialog Label {
+    width: 100%;
+    text-align: center;
+    color: #ffffff;
+    text-style: bold;
+    margin-bottom: 1;
+    border-bottom: solid #333333;
+    padding-bottom: 1;
+}
+
+/* --- WAREZ BUTTONS --- */
+
+#dryrun-dialog Button {
+    width: 100%;
+    height: 3;
+    margin-bottom: 1;
+    background: #000000;
+    border: solid #333333 !important; /* Dark grey default */
+    color: #888888;
+    text-style: bold;
+}
+
+/* Hover State: Aggressive White/Red High Contrast */
+#dryrun-dialog Button:hover {
+    background: #ffffff;
+    border: solid #ffffff !important;
+    color: #000000;
+}
+
+/* Primary Action Highlight */
+#dry-auto {
+    border-left: solid #ffffff !important;
+    color: #ffffff;
+}
+
+/* Cancel Button */
+#dry-cancel {
+    margin-top: 1;
+    border: none !important;
+    color: #ff0000; /* Warez Red */
+}
+
+#dry-cancel:hover {
+    background: #ff0000;
+    color: #ffffff;
+    border: none !important;
+}
+
+/* ==============================================================================
+ * PREVIEW STATUS WIDGET
+ * ============================================================================== */
+
+#preview-status {
+    background: #111111;
+    border-left: solid #ffffff;
+    padding: 0 1;
+    margin-bottom: 1;
+    height: auto;
+}
+
+#preview-status-bar {
+    width: 100%;
+    height: auto;
+    align: left middle;
+}
+
+#preview-status-text {
+    color: #ffffff;
+    text-style: bold;
+    width: 1fr;
+}
+
+#btn-execute-cached {
+    background: #000000;
+    border: solid #00ff00 !important; /* Matrix Green for execute */
+    color: #00ff00;
+    margin: 0 1;
+    height: 3;
+    min-width: 12;
+}
+
+#btn-execute-cached:hover {
+    background: #00ff00;
+    color: #000000;
+}
+
+#btn-forget-preview {
+    background: #000000;
+    border: solid #ff0000 !important;
+    color: #ff0000;
+    margin: 0 1;
+    height: 3;
+    min-width: 12;
+}
+
+#btn-forget-preview:hover {
+    background: #ff0000;
+    color: #ffffff;
+}

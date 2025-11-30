@@ -669,3 +669,123 @@ DirectoryTree {
 /* ==============================================================================
  * END OF HUD CSS
  * ============================================================================== */
+
+/* ==============================================================================
+ * MODAL & DRY RUN STYLING (Phantom Redline Edition)
+ * ============================================================================== */
+
+/* The dark overlay behind the modal */
+DryRunSelectScreen {
+    background: rgba(0, 0, 0, 0.85);
+    align: center middle;
+}
+
+/* The Box Itself - Void Black with Red Alert Border */
+#dryrun-dialog {
+    background: $background;
+    border: solid $redline !important; /* !important forces override of Python defaults */
+    width: 50;
+    height: auto;
+    padding: 1 2;
+}
+
+/* Title text inside the box */
+#dryrun-dialog Label {
+    width: 100%;
+    text-align: center;
+    color: $primary;
+    text-style: bold;
+    margin-bottom: 1;
+    border-bottom: solid $surface;
+    padding-bottom: 1;
+}
+
+/* --- TACTICAL BUTTONS --- */
+
+#dryrun-dialog Button {
+    width: 100%;
+    height: 3;
+    margin-bottom: 1;
+    background: $background;
+    border: solid $surface !important; /* !important ensures we don't get bulky default border */
+    color: $text;
+    text-style: bold;
+}
+
+/* Hover State: The "Redline" Activation */
+#dryrun-dialog Button:hover {
+    background: $surface;
+    border: solid $redline !important; /* Lights up red on hover */
+    color: $primary;
+}
+
+/* Primary Action (Auto Workflow) - Subtle highlight */
+#dry-auto {
+    border-left: solid $redline !important; /* Little red tag on the left */
+    color: $primary;
+}
+
+/* Cancel Button - Pushed to bottom, clearly different */
+#dry-cancel {
+    margin-top: 1;
+    border: none !important; /* No border makes it look less like a button */
+    color: $redline;
+}
+
+#dry-cancel:hover {
+    background: $redline;
+    color: $background;
+    border: none !important;
+}
+
+/* ==============================================================================
+ * PREVIEW STATUS WIDGET (The "After Action" Report)
+ * ============================================================================== */
+
+#preview-status {
+    background: $surface;
+    border-left: solid $primary;
+    padding: 0 1;
+    margin-bottom: 1;
+    height: auto;
+}
+
+#preview-status-bar {
+    width: 100%;
+    height: auto;
+    align: left middle;
+}
+
+#preview-status-text {
+    color: $primary;
+    text-style: bold;
+    width: 1fr;
+}
+
+#btn-execute-cached {
+    background: $background;
+    border: solid $primary !important;
+    color: $primary;
+    margin: 0 1;
+    height: 3;
+    min-width: 12;
+}
+
+#btn-execute-cached:hover {
+    background: $primary;
+    color: $background;
+}
+
+#btn-forget-preview {
+    background: $background;
+    border: solid $redline !important;
+    color: $redline;
+    margin: 0 1;
+    height: 3;
+    min-width: 12;
+}
+
+#btn-forget-preview:hover {
+    background: $redline;
+    color: $background;
+}
