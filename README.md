@@ -70,7 +70,7 @@ git clone https://github.com/BandwagonVibes/fixxer.git
 cd fixxer
 
 # Create a virtual environment
-python3 -m venv venv
+python3.12 -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 
 # Install FIXXER + All Dependencies (CLIP, BRISQUE, Engine)
