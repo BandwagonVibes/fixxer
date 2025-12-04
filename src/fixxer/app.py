@@ -820,6 +820,7 @@ class FixxerTUI(App):
 [bold white]█████   ██[/bold white]   [bold white]  ███     ███  [/bold white]   [bold red]█████   ██████ [/bold red]  [bold red]████████[/bold red]
 [bold white]██      ██[/bold white]   [bold white] ██ ██   ██ ██ [/bold white]   [bold red]██      ██   ██[/bold red]     [bold red]██[/bold red]
 [bold white]██      ██[/bold white]   [bold white]██   ██ ██   ██[/bold white]   [bold red]███████ ██   ██[/bold red]     [bold red]██[/bold red]
+
 [bold red]CHAOS PATCHED // LOGIC INJECTED[/bold red]"""
         
         return logo
