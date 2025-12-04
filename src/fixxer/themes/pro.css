@@ -476,8 +476,8 @@ DirectoryTree {
 /* === STAT BOX CONTAINERS - Compact for header === */
 .hud-box {
     width: auto;
-    min-width: 8;
-    /* Optimized for 1080p displays */
+    min-width: 10;
+    /* Optimized for smaller displays */
     height: auto;
     min-height: 3;
     /* Reduced height for header */
@@ -582,8 +582,8 @@ DirectoryTree {
 
 /* Tiers box - wider to fit A/B/C layout */
 #hud-tiers {
-    min-width: 14;
-    /* Optimized for 1080p displays while maintaining A/B/C alignment */
+    min-width: 15;
+    /* Optimized for smaller displays while maintaining A/B/C alignment */
 }
 
 /* Heroes box - no special styling needed */

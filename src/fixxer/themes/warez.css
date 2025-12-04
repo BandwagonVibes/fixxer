@@ -200,8 +200,8 @@ DirectoryTree {
 
 #log-panel {
     height: 1fr;
-    min-height: 20;
-    /* Increased from 15 for better visibility */
+    min-height: 35;
+    /* Significantly increased for better log visibility */
     max-height: 1fr;
 }
 

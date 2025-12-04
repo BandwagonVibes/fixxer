@@ -820,12 +820,7 @@ class FixxerTUI(App):
 [bold white]█████   ██[/bold white]   [bold white]  ███     ███  [/bold white]   [bold red]█████   ██████ [/bold red]  [bold red]████████[/bold red]
 [bold white]██      ██[/bold white]   [bold white] ██ ██   ██ ██ [/bold white]   [bold red]██      ██   ██[/bold red]     [bold red]██[/bold red]
 [bold white]██      ██[/bold white]   [bold white]██   ██ ██   ██[/bold white]   [bold red]███████ ██   ██[/bold red]     [bold red]██[/bold red]
-
-[dim white]▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀[/dim white]
-[dim white]▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄[/dim white]
-
-[bold red]CHAOS PATCHED // LOGIC INJECTED[/bold red]
-[dim white]INTEGRITY VERIFIED | FILE OPERATIONS SECURED[/dim white]"""
+[bold red]CHAOS PATCHED // LOGIC INJECTED[/bold red]"""
         
         return logo
 
