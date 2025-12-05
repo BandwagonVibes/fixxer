@@ -1,122 +1,13 @@
-# FIXXER ✞ PRO - Logic Injected Dependencies
-# Install with: pip install -r requirements.txt
-
-# ==============================================================================
-# CORE DEPENDENCIES (Required)
-# ==============================================================================
-
-# --- TUI Framework ---
-textual>=0.47.0              # Modern terminal user interface
-rich>=13.7.0                 # Rich text and formatting in terminal
-
-# --- Image Processing & Analysis ---
-Pillow>=10.0.0               # Python Imaging Library (PNG, JPEG handling)
-opencv-python>=4.8.0         # Computer vision (quality analysis, Laplacian)
-numpy>=1.24.0                # Numerical arrays (required by OpenCV)
-
-# --- The Heavy Hitters (Now included by default) ---
-# BRISQUE Quality Scoring
-image-quality>=1.2.7         # BRISQUE scoring - professional quality assessment
-# CLIP / Semantic Burst Detection
-sentence-transformers>=2.2.0 # CLIP embeddings (semantic similarity)
-scikit-learn>=1.3.0          # DBSCAN clustering for burst grouping
-
-# --- RAW File Support ---
-rawpy>=0.19.0                # RAW image decoding (libraw wrapper)
-                             # Supports 120+ formats: RW2, CR2, NEF, ARW, etc.
-
-# --- Perceptual Hashing ---
-ImageHash>=4.3.1             # Burst detection via pHash (visual fingerprinting)
-
-# --- EXIF Metadata ---
-ExifRead>=3.0.0              # Extract camera info, timestamps, settings
-
-# --- HTTP Client ---
-requests>=2.31.0             # Ollama API communication
-
-# --- System Monitoring ---
-psutil>=5.9.0                # CPU/RAM sparklines in TUI
-
-
-# ==============================================================================
-# EXTERNAL DEPENDENCIES (Not pip-installable)
-# ==============================================================================
-
-# Ollama - Local LLM inference for AI vision features
-#   Installation: https://ollama.ai
-#   Models: ollama pull qwen2.5vl:3b
-#           ollama pull llava:latest
-#
-# Recommended model: qwen2.5vl:3b (fast, accurate, 2.2GB)
-
-
-# ==============================================================================
-# DEVELOPMENT DEPENDENCIES (Optional)
-# ==============================================================================
-
-# pytest>=7.4.0              # Testing framework
-# black>=23.0.0              # Code formatter
-# flake8>=6.0.0              # Linting
-# mypy>=1.5.0                # Type checking
-
-
-# ==============================================================================
-# PLATFORM NOTES
-# ==============================================================================
-
-# macOS:
-#   - All dependencies install cleanly via pip
-#   - Homebrew Python recommended: brew install python@3.11
-#
-# Linux (Ubuntu/Debian):
-#   - May need: sudo apt install python3-opencv libraw-dev
-#   - Virtual environment recommended
-#
-# Windows:
-#   - WSL (Windows Subsystem for Linux) strongly recommended
-#   - Native Windows: Install Visual C++ Build Tools for opencv-python
-#   - rawpy may require Microsoft Visual C++ 14.0+
-#
-# Docker:
-#   - Base image: python:3.11-slim
-#   - apt install: libgl1-mesa-glx libglib2.0-0 (for OpenCV)
-
-
-# ==============================================================================
-# VERSION CONSTRAINTS EXPLAINED
-# ==============================================================================
-
-# ">=" (greater than or equal):
-#   - Ensures minimum version for required features
-#   - Allows automatic security/bugfix updates
-#
-# Specific versions not pinned because:
-#   - FIXXER uses stable APIs (Pillow, OpenCV, NumPy)
-#   - Allows users to benefit from upstream improvements
-#   - No known breaking changes in major versions listed
-#
-# For production deployment with version locking:
-#   pip freeze > requirements-lock.txt
-
-
-# ==============================================================================
-# TROUBLESHOOTING
-# ==============================================================================
-
-# "ERROR: Could not build wheels for opencv-python"
-#   → Install system dependencies first (see Platform Notes above)
-#
-# "ImportError: libGL.so.1: cannot open shared object file"
-#   → Linux: sudo apt install libgl1-mesa-glx
-#
-# "rawpy.LibRawError" when processing RAW files
-#   → Ensure libraw-dev is installed (Linux/WSL)
-#
-# "ConnectionError: Could not connect to Ollama"
-#   → Start Ollama: ollama serve
-#   → Verify: curl http://localhost:11434/api/tags
-#
-# Out of memory when processing large RAW files
-#   → RAW processing uses in-memory buffers
-#   → Consider processing in smaller batches
-#   → Close other applications to free RAM
+textual>=0.47.0
+rich>=13.7.0
+Pillow>=10.0.0
+opencv-python>=4.8.0
+numpy>=1.24.0
+image-quality>=1.2.7
+sentence-transformers>=2.2.0
+scikit-learn>=1.3.0
+rawpy>=0.19.0
+ImageHash>=4.3.1
+ExifRead>=3.0.0
+requests>=2.31.0
+psutil>=5.9.0
