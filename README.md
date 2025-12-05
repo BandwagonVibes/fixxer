@@ -59,28 +59,23 @@ Built for photographers who demand both **speed** and **safety** in their digita
 **Zero friction. Full power.**
 
 ### Prerequisites
-- **Python 3.10-3.12** (Note: Python 3.13+ is not currently supported due to dependency constraints)
+- **macOS** (Homebrew installation) or **Python 3.10-3.12** for manual install
 - **Ollama** (for AI vision features) - [https://ollama.ai](https://ollama.ai)
 - Supported OS: macOS, Linux, Windows (WSL recommended)
 
-### 1. Install
+### 1. Install via Homebrew (Recommended - macOS)
 
 ```bash
-git clone https://github.com/BandwagonVibes/fixxer.git
-cd fixxer
+# Add the FIXXER tap
+brew tap bandwagonvibes/fixxer
 
-# Create a virtual environment
-python3.12 -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
-
-# Install FIXXER + All Dependencies (CLIP, BRISQUE, Engine)
-# This also installs the 'fixxer' command globally in this venv
-pip install -e .
+# Install FIXXER
+brew install fixxer
 ```
 
-### 2. Launch
+That's it! Homebrew handles all dependencies automatically.
 
-Since you installed in editable mode (`-e .`), you don't need `python file.py`. Just type:
+### 2. Launch
 
 ```bash
 fixxer
@@ -105,6 +100,29 @@ ollama pull qwen2.5vl:3b
 ### 🔰 New to Terminals?
 
 If you've never opened a terminal before, check out our [**Beginner's Guide**](BEGINNERS_GUIDE.md) - a gentle introduction that teaches you everything you need to know.
+
+---
+
+### 🔧 Development Installation (From Source)
+
+For development or if you're on Linux/Windows, you can install from source:
+
+```bash
+git clone https://github.com/BandwagonVibes/fixxer.git
+cd fixxer
+
+# Create a virtual environment
+python3.12 -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+
+# Install FIXXER + All Dependencies (CLIP, BRISQUE, Engine)
+# This also installs the 'fixxer' command globally in this venv
+pip install -e .
+```
+
+**Launch:** Since you installed in editable mode (`-e .`), just type `fixxer` after activating your venv.
+
+**Note:** Python 3.13+ is not currently supported due to dependency constraints.
 
 ---
 

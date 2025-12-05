@@ -62,7 +62,33 @@ Let's look at the command you'll use to install dependencies:
 
 Now that you know the language, let's execute the installation. You'll type (or copy-paste) these lines one by one, pressing **Enter** after each line.
 
-### Step A: Download the Code
+### Option A: Easy Install with Homebrew (Mac Only - Recommended)
+
+If you're on a Mac, this is the simplest way. Homebrew is like an "app store" for terminal programs.
+
+**First, install Homebrew if you don't have it:**
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+**Then install FIXXER:**
+```bash
+# Add the FIXXER tap (this tells Homebrew where to find FIXXER)
+brew tap bandwagonvibes/fixxer
+
+# Install FIXXER (this downloads and installs everything automatically)
+brew install fixxer
+```
+
+That's it! Skip to Step 5 to launch it.
+
+---
+
+### Option B: Install From Source (All Platforms)
+
+If you're on Windows/Linux or prefer to install from source:
+
+**Step 1: Download the Code**
 
 This uses `git` to download the FIXXER folder from the internet to your computer.
 
@@ -70,7 +96,7 @@ This uses `git` to download the FIXXER folder from the internet to your computer
 git clone https://github.com/BandwagonVibes/fixxer.git
 ```
 
-### Step B: Enter the Folder
+**Step 2: Enter the Folder**
 
 This command `cd` (Change Directory) moves you inside the folder you just downloaded.
 
@@ -78,7 +104,7 @@ This command `cd` (Change Directory) moves you inside the folder you just downlo
 cd fixxer
 ```
 
-### Step C: Create a Safe Space (Virtual Environment)
+**Step 3: Create a Safe Space (Virtual Environment)**
 
 This creates a "virtual environment." Think of this like a **sandbox**. Anything we install here stays inside this folder and won't mess up your other computer settings.
 
@@ -100,7 +126,7 @@ venv\Scripts\activate
 
 You'll know it worked when your terminal line starts with `(venv)`.
 
-### Step D: The Final Install
+**Step 4: The Final Install**
 
 This installs FIXXER and all the fancy AI brains (CLIP, BRISQUE) into your sandbox.
 
@@ -128,12 +154,16 @@ fixxer
 
 ## 🆘 Troubleshooting
 
-### "Command not found: git"
+### "Command not found: brew" (Mac users doing Homebrew install)
+- Install Homebrew first: `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`
+- Visit [brew.sh](https://brew.sh) for more info
+
+### "Command not found: git" (Source install only)
 - **Mac:** Install with `xcode-select --install`
 - **Windows:** Download from [git-scm.com](https://git-scm.com)
 - **Linux:** `sudo apt install git`
 
-### "Command not found: python3"
+### "Command not found: python3" (Source install only)
 - **Mac:** Install with `brew install python@3.11` (install Homebrew first: [brew.sh](https://brew.sh))
 - **Windows:** Download from [python.org](https://python.org)
 - **Linux:** `sudo apt install python3 python3-venv`
